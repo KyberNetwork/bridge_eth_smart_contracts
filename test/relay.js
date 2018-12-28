@@ -57,19 +57,22 @@ contract("Relay", async accounts => {
 
         let v,r,s
         [v,r,s] = getSigParts(bs58SigToHex(signatureRaw))
-        //expectedSigningKey = "0x"+bs58pubKeyToHex(expectedSigningKeyRaw).toString("hex")
+        expectedSigningKey = "0x"+bs58pubKeyToHex(expectedSigningKeyRaw).toString("hex")
         // TODO: uncompress the key, for now using python code for it
 
-        // this is as calculated in uncompress.py abd stripped of from leading 0x04
-        claimedSignerPubKey =  "0xc0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeeceff7130fd352c698d2279967e2397f045479940bb4e7fb178fd9212fca8c0"
-        
+        // this is as calculated in uncompress.py and stripped of from leading 0x04
+        claimedSignerPubKey = [ expectedSigningKey, // "0xc0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cf",
+                               "0xeeceff7130fd352c698d2279967e2397f045479940bb4e7fb178fd9212fca8c0"]
+        storedCompressedPubKey = expectedSigningKey
+
         console.log("header", header)
         console.log("bmRoot", bmRoot)
         console.log("schedule", schedule)
         console.log("v", v)
         console.log("r", r)
         console.log("s", s)
-        console.log("claimedSignerPubKey", claimedSignerPubKey)
+        console.log("claimedSignerPubKey   ", claimedSignerPubKey)
+        console.log("storedCompressedPubKey", expectedSigningKeyRaw)
 
         //04c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeeceff7130fd352c698d2279967e2397f045479940bb4e7fb178fd9212fca8c0
 
@@ -81,7 +84,8 @@ contract("Relay", async accounts => {
                 v,
                 r,
                 s,
-                claimedSignerPubKey
+                claimedSignerPubKey,
+                storedCompressedPubKey
         )
         console.log(verified)
         assert(verified, "block not verified correctly")

@@ -47,6 +47,10 @@ contract Relay {
     uint constant SCHEDULE_MASK = 2 ** SCHEDULE_BITS - 1;
     uint constant SCHEDULE_OFFSET = ACTION_MROOT_1_OFFSET - SCHEDULE_BITS;
 
+    uint constant HAVE_NEW_PRODUCERS_BITS  = 8;
+    uint constant HAVE_NEW_PRODUCERS_MASK = 2 ** HAVE_NEW_PRODUCERS_BITS - 1;
+    uint constant HAVE_NEW_PRODUCERS_OFFSET = SCHEDULE_OFFSET - HAVE_NEW_PRODUCERS_BITS;
+
     function sliceBytes32(bytes memory bs, uint start) internal pure returns (uint)
     {
         require(bs.length >= start + 32, "slicing out of range");
@@ -68,11 +72,12 @@ contract Relay {
     }
 
 
-    function parseHeader(bytes calldata blockHeader) external pure returns (uint32){
+    function parseHeader(bytes calldata blockHeader) external pure returns (uint8){
         /* expected sizes 4, 8, 2, 32, 32, 32, 4, 1, 1 */
         //https://ethereum.stackexchange.com/questions/42659/parse-arbitrary-bytes-input
 
         uint chunk;
+
         chunk = sliceBytes32(blockHeader, 0);
         uint32 timestamp = (uint32)((chunk >> TIMESTAMP_OFFSET) & TIMESTAMP_MASK);
         uint64 producer = (uint64)((chunk >> PRODUCER_OFFSET) & PRODUCER_MASK);
@@ -87,17 +92,22 @@ contract Relay {
         uint tx_mroot_1 = (uint)((chunk >> TX_MROOT_1_OFFSET) & TX_MROOT_1_MASK);
         uint action_mroot_0 = (uint)((chunk >> ACTION_MROOT_0_OFFSET) & ACTION_MROOT_0_MASK);
 
-        // read only 20B, since not sure if optional firalds are there
+        // read only 20B, since not sure if optional fields are there
         uint chunk160 = sliceBytes20(blockHeader, 96);
         uint action_mroot_1 = (uint)((chunk160 >> ACTION_MROOT_1_OFFSET) & ACTION_MROOT_1_MASK);
         uint32 schedule = (uint32)((chunk160 >> SCHEDULE_OFFSET) & SCHEDULE_MASK);
-        
+        // new producers field is optional
+        uint8 have_new_producers = (uint8)((chunk160 >> HAVE_NEW_PRODUCERS_OFFSET) & HAVE_NEW_PRODUCERS_MASK);
+
+        if(have_new_producers) {
+            // TBD..
+        }
 
         uint previous = (previous_0 << PREVIOUS_1_BITS) | previous_1; 
         uint tx_mroot = (tx_mroot_0 << TX_MROOT_1_BITS) | tx_mroot_1;
         uint action_mroot = (action_mroot_0 << ACTION_MROOT_1_BITS) | action_mroot_1;
 
-        return schedule;
+        return have_new_producers;
     }
 
     function verifyBlockSig(

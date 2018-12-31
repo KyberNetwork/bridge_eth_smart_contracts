@@ -26,15 +26,19 @@ contract Relay {
         return x;
     }
 
+    function reverseBytes(uint32 input) internal pure returns (uint32 output)
+    {
+        output = input >> 24 & 0xff | input >> 8 & 0xff00 | input << 8 & 0xff0000 |  input << 24 & 0xff000000;
+    }
+
     function parseFixedFields0(bytes memory blockHeader)
         internal
         pure
         returns (uint32 ts, uint64 producer, uint16 confirmed, uint previous, uint tx_mroot)
     {
-
         uint offset = 0;
 
-        ts = (uint32)(sliceBytes(blockHeader, offset, TIMESTAMP_BYTES));
+        ts = reverseBytes((uint32)(sliceBytes(blockHeader, offset, TIMESTAMP_BYTES)));
         offset = offset + TIMESTAMP_BYTES;
 
         producer = (uint64)(sliceBytes(blockHeader, offset, PRODUCER_BYTES));
@@ -55,10 +59,9 @@ contract Relay {
         pure
         returns (uint32 schedule, uint action_mroot, uint8 have_new_producers)
     {
-
         uint offset = 78;
 
-        schedule = (uint32)(sliceBytes(blockHeader, offset, SCHEDULE_BYTES));
+        schedule = reverseBytes((uint32)(sliceBytes(blockHeader, offset, SCHEDULE_BYTES)));
         offset = offset + SCHEDULE_BYTES;
 
         action_mroot = (uint256)(sliceBytes(blockHeader, offset, ACTION_MROOT_BYTES));
@@ -73,10 +76,9 @@ contract Relay {
         pure
         returns (uint32 version, uint8 amount, uint64[21] memory producerNames, bytes32[21] memory producerKeyHighChunk)
     {
-
         uint offset = 115;
 
-        version = (uint32)(sliceBytes(blockHeader, offset, PRODUCERS_VERSION_BYTES));
+        version = reverseBytes((uint32)(sliceBytes(blockHeader, offset, PRODUCERS_VERSION_BYTES)));
         offset = offset + PRODUCERS_VERSION_BYTES;
 
         amount = (uint8)(sliceBytes(blockHeader, offset, PRODUCERS_AMOUNT_BYTES));
@@ -111,8 +113,6 @@ contract Relay {
             bytes32[21] memory producerKeyHighChunk // TODO: this should be 33 bytes!!!
         )
     {
-        /* expected sizes 4, 8, 2, 32, 32, 32, 4, 1, 1 */
-
         (timestamp, producer, confirmed, previous, tx_mroot) = parseFixedFields0(blockHeader);
         uint8 have_new_producers;
         (schedule, action_mroot, have_new_producers) = parseFixedFields1(blockHeader);

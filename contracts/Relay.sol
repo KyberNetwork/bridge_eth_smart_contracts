@@ -3,107 +3,51 @@ pragma solidity 0.5.0;
 
 contract Relay {
 
-    // chunk 0
-    uint constant TIMESTAMP_BITS  = 32;
-    uint constant TIMESTAMP_MASK = 2 ** TIMESTAMP_BITS - 1;
-    uint constant TIMESTAMP_OFFSET = 256 - TIMESTAMP_BITS; // 224
+    uint constant TIMESTAMP_BYTES               = 4;
+    uint constant PRODUCER_BYTES                = 8;
+    uint constant CONFIRMED_BYTES               = 2;
+    uint constant PREVIOUS_BYTES                = 32;
+    uint constant TX_MROOT_BYTES                = 32;
+    uint constant ACTION_MROOT_BYTES            = 32;
+    uint constant SCHEDULE_BYTES                = 4;
+    uint constant HAVE_NEW_PRODUCERS_BYTES      = 1;
+    uint constant PRODUCERS_VERSION_BYTES       = 4;
+    uint constant PRODUCERS_NAME_BYTES          = 8;
+    uint constant PRODUCERS_AMOUNT_BYTES        = 1;
+    uint constant PRODUCERS_KEY_HIGH_BYTES      = 32;
 
-    uint constant PRODUCER_BITS  = 64;
-    uint constant PRODUCER_MASK = 2 ** PRODUCER_BITS - 1;
-    uint constant PRODUCER_OFFSET = TIMESTAMP_OFFSET - PRODUCER_BITS; // 160
-
-    uint constant CONFIRMED_BITS  = 16;
-    uint constant CONFIRMED_MASK = 2 ** CONFIRMED_BITS - 1;
-    uint constant CONFIRMED_OFFSET = PRODUCER_OFFSET - CONFIRMED_BITS; // 144
-
-    uint constant PREVIOUS_0_BITS  = CONFIRMED_OFFSET; // 144
-    uint constant PREVIOUS_0_MASK = 2 ** PREVIOUS_0_BITS - 1;
-    uint constant PREVIOUS_0_OFFSET = 0;
-
-    // chunk 1
-    uint constant PREVIOUS_1_BITS  = 256 - PREVIOUS_0_BITS; // 112
-    uint constant PREVIOUS_1_MASK = 2 ** PREVIOUS_1_BITS - 1;
-    uint constant PREVIOUS_1_OFFSET = 256 - PREVIOUS_1_BITS; // 144
-
-    uint constant TX_MROOT_0_BITS  = 256 - PREVIOUS_1_BITS; // 144
-    uint constant TX_MROOT_0_MASK = 2 ** TX_MROOT_0_BITS - 1;
-    uint constant TX_MROOT_0_OFFSET = 0;
-
-    // chunk 2
-    uint constant TX_MROOT_1_BITS  = 256 - TX_MROOT_0_BITS; // 112
-    uint constant TX_MROOT_1_MASK = 2 ** TX_MROOT_1_BITS - 1;
-    uint constant TX_MROOT_1_OFFSET = 256 - TX_MROOT_1_BITS; // 144
-
-    uint constant ACTION_MROOT_0_BITS  = 256 - TX_MROOT_1_BITS; // 144
-    uint constant ACTION_MROOT_0_MASK = 2 ** ACTION_MROOT_0_BITS - 1;
-    uint constant ACTION_MROOT_0_OFFSET = 0; 
-
-    // chunk 3
-    uint constant ACTION_MROOT_1_BITS  = 256 - ACTION_MROOT_0_BITS; // 112
-    uint constant ACTION_MROOT_1_MASK = 2 ** ACTION_MROOT_1_BITS - 1;
-    uint constant ACTION_MROOT_1_OFFSET = 160 - ACTION_MROOT_1_BITS; // 48
-
-    uint constant SCHEDULE_BITS  = 32;
-    uint constant SCHEDULE_MASK = 2 ** SCHEDULE_BITS - 1;
-    uint constant SCHEDULE_OFFSET = ACTION_MROOT_1_OFFSET - SCHEDULE_BITS; // 16
-
-    uint constant HAVE_NEW_PRODUCERS_BITS  = 8;
-    uint constant HAVE_NEW_PRODUCERS_MASK = 2 ** HAVE_NEW_PRODUCERS_BITS - 1;
-    uint constant HAVE_NEW_PRODUCERS_OFFSET = SCHEDULE_OFFSET - HAVE_NEW_PRODUCERS_BITS; // 8
-
-    function sliceBytes32(bytes memory bs, uint start) internal pure returns (uint)
+    function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
     {
-        require(bs.length >= start + 32, "slicing out of range");
+        require(bs.length >= start + size, "slicing out of range");
         uint x;
         assembly {
-            x := mload(add(bs, add(0x20, start)))
+            x := mload(add(bs, add(size, start)))
         }
         return x;
-    }
-
-    function sliceBytes20(bytes memory bs, uint start) internal pure returns (uint)
-    {
-        require(bs.length >= start + 20, "slicing out of range");
-        uint x;
-        assembly {
-            x := mload(add(bs, add(0x14, start)))
-        }
-            return x;
-    }
-
-    function sliceBytes4(bytes memory bs, uint start) internal pure returns (uint32)
-    {
-        require(bs.length >= start + 4, "slicing out of range");
-        uint32 x;
-        assembly {
-            x := mload(add(bs, add(0x4, start)))
-        }
-            return x;
     }
 
     function parseFixedFields0(bytes memory blockHeader)
         internal
         pure
-        returns (uint32 timestamp, uint64 producer, uint16 confirmed, uint previous, uint tx_mroot)
+        returns (uint32 ts, uint64 producer, uint16 confirmed, uint previous, uint tx_mroot)
     {
 
-        uint chunk;
+        uint offset = 0;
 
-        chunk = sliceBytes32(blockHeader, 0);
-        timestamp = (uint32)((chunk >> TIMESTAMP_OFFSET) & TIMESTAMP_MASK);
-        producer = (uint64)((chunk >> PRODUCER_OFFSET) & PRODUCER_MASK);
-        confirmed = (uint16)((chunk >> CONFIRMED_OFFSET) & CONFIRMED_MASK);
-        uint previous_0 = (uint)((chunk >> PREVIOUS_0_OFFSET) & PREVIOUS_0_MASK);
+        ts = (uint32)(sliceBytes(blockHeader, offset, TIMESTAMP_BYTES));
+        offset = offset + TIMESTAMP_BYTES;
 
-        chunk = sliceBytes32(blockHeader, 32);
-        uint previous_1 = (uint)((chunk >> PREVIOUS_1_OFFSET) & PREVIOUS_1_MASK);
-        uint tx_mroot_0 = (uint)((chunk >> TX_MROOT_0_OFFSET) & TX_MROOT_0_MASK);
+        producer = (uint64)(sliceBytes(blockHeader, offset, PRODUCER_BYTES));
+        offset = offset + PRODUCER_BYTES;
 
-        chunk = sliceBytes32(blockHeader, 64);
-        uint tx_mroot_1 = (uint)((chunk >> TX_MROOT_1_OFFSET) & TX_MROOT_1_MASK);
+        confirmed = (uint16)(sliceBytes(blockHeader, offset, CONFIRMED_BYTES));
+        offset = offset + CONFIRMED_BYTES;
 
-        previous = (previous_0 << PREVIOUS_1_BITS) | previous_1; 
-        tx_mroot = (tx_mroot_0 << TX_MROOT_1_BITS) | tx_mroot_1;
+        previous = (uint256)(sliceBytes(blockHeader, offset, PREVIOUS_BYTES));
+        offset = offset + PREVIOUS_BYTES;
+
+        tx_mroot = (uint256)(sliceBytes(blockHeader, offset, TX_MROOT_BYTES));
+        offset = offset + TX_MROOT_BYTES;
     }
 
     function parseFixedFields1(bytes memory blockHeader)
@@ -111,19 +55,17 @@ contract Relay {
         pure
         returns (uint32 schedule, uint action_mroot, uint8 have_new_producers)
     {
-        // TODO: remove duplication
 
-        uint chunk;
-        chunk = sliceBytes32(blockHeader, 64);
-        uint action_mroot_0 = (uint)((chunk >> ACTION_MROOT_0_OFFSET) & ACTION_MROOT_0_MASK);
+        uint offset = 78;
 
-        // read only 20B, since not sure if optional fields are there
-        uint chunk160 = sliceBytes20(blockHeader, 96);
-        uint action_mroot_1 = (uint)((chunk160 >> ACTION_MROOT_1_OFFSET) & ACTION_MROOT_1_MASK);
-        schedule = (uint32)((chunk160 >> SCHEDULE_OFFSET) & SCHEDULE_MASK);
-        have_new_producers = (uint8)((chunk160 >> HAVE_NEW_PRODUCERS_OFFSET) & HAVE_NEW_PRODUCERS_MASK);
+        schedule = (uint32)(sliceBytes(blockHeader, offset, SCHEDULE_BYTES));
+        offset = offset + SCHEDULE_BYTES;
 
-        action_mroot = (action_mroot_0 << ACTION_MROOT_1_BITS) | action_mroot_1;
+        action_mroot = (uint256)(sliceBytes(blockHeader, offset, ACTION_MROOT_BYTES));
+        offset = offset + ACTION_MROOT_BYTES;
+
+        have_new_producers = (uint8)(sliceBytes(blockHeader, offset, HAVE_NEW_PRODUCERS_BYTES));
+        offset = offset + HAVE_NEW_PRODUCERS_BYTES;
     }
 
     function parseNonFixedFields(bytes memory blockHeader)
@@ -131,26 +73,24 @@ contract Relay {
         pure
         returns (uint32 version, uint8 amount, uint64[21] memory producerNames, bytes32[21] memory producerKeyHighChunk)
     {
-        version = sliceBytes4(blockHeader, 96 + 19); // 4 bytes version
-        amount = (uint8)(blockHeader[96+19+4]);// 1 byte amount
 
-        uint offset = 120; 
+        uint offset = 115;
+
+        version = (uint32)(sliceBytes(blockHeader, offset, PRODUCERS_VERSION_BYTES));
+        offset = offset + PRODUCERS_VERSION_BYTES;
+
+        amount = (uint8)(sliceBytes(blockHeader, offset, PRODUCERS_AMOUNT_BYTES));
+        offset = offset + PRODUCERS_AMOUNT_BYTES;
 
         for (uint i = 0; i < amount; i++) {
-            require(blockHeader.length >= offset + 8, "slicing out of range");
-            uint64 x;
-            assembly {x := mload(add(blockHeader, add(0x8, offset)))}
-            producerNames[i] = x;
-            offset = offset + 8;
+            producerNames[i] = (uint64)(sliceBytes(blockHeader, offset, PRODUCERS_NAME_BYTES));
+            offset = offset + PRODUCERS_NAME_BYTES;
 
             offset = offset + 1; // skip 1 zeroed bytes
             offset = offset + 1; // skip first byte of the key
 
-            require(blockHeader.length >= offset + 32, "slicing out of range");
-            bytes32 y;
-            assembly {y := mload(add(blockHeader, add(32, offset)))}
-            producerKeyHighChunk[i] = y; 
-            offset = offset + 32;
+            producerKeyHighChunk[i] = (bytes32)(sliceBytes(blockHeader, offset, PRODUCERS_KEY_HIGH_BYTES));
+            offset = offset + PRODUCERS_KEY_HIGH_BYTES;
         }
     } 
 

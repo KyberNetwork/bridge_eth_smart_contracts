@@ -90,6 +90,7 @@ contract("Relay", async accounts => {
         console.log(verified)
         assert(verified, "block not verified correctly")
     })
+
     it("parse header", async () => {
         // this includes new producers:
         headerRaw = "[ 95 18 79 47 00 00 00 00 00 ea 30 55 00 00 00 00 00 01 bc f2 f4 48 22 5d 09 96 85 f1 4d a7 68 03 02 89 26 af 04 d2 60 7e af cf 60 9c 26 5c 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 74 7d 10 3e 24 c9 6d eb 1b ee bc 13 eb 31 f7 c2 18 81 26 94 6c 86 77 df d1 69 1a f9 f9 c0 3a b1 00 00 00 00 01 57 01 00 00 04 00 00 00 00 00 ea 30 55 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 00 73 a2 c9 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 80 49 af f1 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 80 69 a2 73 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 ]"
@@ -109,5 +110,48 @@ contract("Relay", async accounts => {
         console.log("amount: ", result[8]);
         console.log("producerNames: \n", result[9]);
         console.log("producerKeysHigh: \n", result[10]);
+    });
+
+    it("validate merkle proof", async () => {
+        
+        leaves = ["0x0ff38b06e8d91eb9e0e315baadf124dd6088d985830af83e5fe9d19a1aec94db",
+                  "0x04ca2c2c485ebd1ff324b61ff351cf8810d40fb53cc54f1de4136461b4d15a91",
+                  "0xf642ce52f6d266daeffda3798cde463b375515e2ff07f28169142cda4fae81da",
+                  "0xa1c526efa754b4c7b86bea5096ced3da383fb95c2f06b5147843b818055e5926",
+                  "0x3eaa2d991b2e6bed7b11cdd1ecc4f591fdf32102c4b17417b71c255edd2116df",
+                  "0x1863f557d6c65a9bb14c681dac086acde422725f2e51490d212fd60f15c0e457",
+                  "0x64f457ce04f13bbf1f1f3fd108ba43ccc6e77f6851029b438bcf436be412308a"]
+
+         paths = [["0x84ca2c2c485ebd1ff324b61ff351cf8810d40fb53cc54f1de4136461b4d15a91",
+                  "0x98a5352460276f18cb130dc10c2266f98b4f98844fb06a8cb8d156a23abb36de",
+                  "0xbe99e8ffbfd7eaf2969c487ce05c61d106cf87f1b1db50a88c1ff0339ba29040"],
+                 ["0x0ff38b06e8d91eb9e0e315baadf124dd6088d985830af83e5fe9d19a1aec94db",
+                  "0x98a5352460276f18cb130dc10c2266f98b4f98844fb06a8cb8d156a23abb36de",
+                  "0xbe99e8ffbfd7eaf2969c487ce05c61d106cf87f1b1db50a88c1ff0339ba29040"],
+                 ["0xa1c526efa754b4c7b86bea5096ced3da383fb95c2f06b5147843b818055e5926",
+                  "0x6b104f5d1fd3a7efc6ded56f337f4e0dc1b7b67a88da128613d43c221d0e6718",
+                  "0xbe99e8ffbfd7eaf2969c487ce05c61d106cf87f1b1db50a88c1ff0339ba29040"],
+                 ["0x7642ce52f6d266daeffda3798cde463b375515e2ff07f28169142cda4fae81da",
+                  "0x6b104f5d1fd3a7efc6ded56f337f4e0dc1b7b67a88da128613d43c221d0e6718",
+                  "0xbe99e8ffbfd7eaf2969c487ce05c61d106cf87f1b1db50a88c1ff0339ba29040"],
+                 ["0x9863f557d6c65a9bb14c681dac086acde422725f2e51490d212fd60f15c0e457",
+                  "0xcfdf4879f658aa25845a1058400194db668177c07367eda6239d0330559a62bc",
+                  "0x503dca34c439c417f755cde8420379eafb9b2d7179b5acfc1b302e5fc869d975"],
+                 ["0x3eaa2d991b2e6bed7b11cdd1ecc4f591fdf32102c4b17417b71c255edd2116df",
+                  "0xcfdf4879f658aa25845a1058400194db668177c07367eda6239d0330559a62bc",
+                  "0x503dca34c439c417f755cde8420379eafb9b2d7179b5acfc1b302e5fc869d975"],
+                 ["0xe4f457ce04f13bbf1f1f3fd108ba43ccc6e77f6851029b438bcf436be412308a",
+                  "0x099df29b96e436d09301bda47f9ebc055b5e91bc24a10a614c39bc4e2b213a86",
+                  "0x503dca34c439c417f755cde8420379eafb9b2d7179b5acfc1b302e5fc869d975"]]
+
+        root = "0xdeac5a4438f924f5c24fc7c65bf7d0e39817db67e958ce81772b05a072e2e1fd";
+
+        const relay = await Relay.new()
+        var i;
+        for (i = 0; i < leaves.length; i++) {
+            const valid = await relay.proofIsValid(leaves[i], paths[i], root);
+            console.log(valid);
+            assert(valid, "proof is not valid")
+        }
     });
 })

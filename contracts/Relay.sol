@@ -15,6 +15,8 @@ contract Relay {
     uint constant PRODUCERS_NAME_BYTES          = 8;
     uint constant PRODUCERS_AMOUNT_BYTES        = 1;
     uint constant PRODUCERS_KEY_HIGH_BYTES      = 32;
+    uint constant OR_MASK =   0x8000000000000000000000000000000000000000000000000000000000000000;
+    uint constant AND_MASK =  0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
     {
@@ -118,7 +120,6 @@ contract Relay {
         (schedule, action_mroot, have_new_producers) = parseFixedFields1(blockHeader);
 
         if(have_new_producers != 0 ) {
-            
             (version, amount, producerNames, producerKeyHighChunk) = parseNonFixedFields(blockHeader);
         }
     }
@@ -149,5 +150,39 @@ contract Relay {
             (claimedSignerPubKey[0] == storedCompressedPubKey) && // signer is part of current schedule
             (calcAddress == claimedSignerAddress)                 // signer signed the given block data 
         );
+    }
+
+    function makeCanonicalLeft(bytes32 self) internal pure returns (bytes32) {
+        return (bytes32)((uint)(self) & AND_MASK);
+    }
+
+    function makeCanonicalRight(bytes32 self) internal pure returns (bytes32) {
+        return (bytes32)((uint)(self) | OR_MASK);
+    }
+
+    function isCanonicalRight(bytes32 self) internal pure returns (bool) {
+        return (((uint)(self) >> 255) == 1);
+    }
+
+    function proofIsValid(bytes32 leaf, bytes32[] calldata path, bytes32 expectedRoot) external pure returns (bool) {
+        bytes32 current = leaf;
+        bytes32 left;
+        bytes32 right;
+        
+        for (uint i = 0; i < path.length; i++) {
+            if(isCanonicalRight(path[i])) {
+                left = current;
+                right = path[i];
+            } else {
+                left = path[i];
+                right = current;
+            }
+            left = makeCanonicalLeft(left);
+            right = makeCanonicalRight(right);
+
+            current = sha256(abi.encodePacked(left, right));
+        }
+
+        return (current == expectedRoot);
     }
 }

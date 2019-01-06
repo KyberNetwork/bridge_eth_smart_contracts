@@ -52,9 +52,9 @@ expectedSigningKey = "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"
 console.log("/////////////////////////////////////")
 console.log("eos works")
 console.log("PUBLIC KEY RECOVERY ( EOS Library ) :");
-const e = ecc.recoverHash(signature, hashedMsgBuffer);
-const prefix = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(0,2);
-const key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
+let e = ecc.recoverHash(signature, hashedMsgBuffer);
+let prefix = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(0,2);
+let key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
 console.log(e + " ===> " + prefix + " + " + key );    
 assert.equal(expectedSigningKey, e)
 console.log("/////////////////////////////////////")
@@ -123,4 +123,30 @@ const eth_signer = EthCrypto.recoverPublicKey(ethSignatureStr, messageHash);
 console.log("PUBLIC KEY RECOVERY ( ETH Library) :");
 console.log(eth_signer.slice(0,64) + " + " + eth_signer.slice(64));
 assert.equal(eth_signer.slice(0,64),expectedSigningKeyHex.toString("hex"))
+console.log("/////////////////////////////////////")
+
+console.log("/////////////////////////////////////")
+console.log("verify signature from jungle2 testnet block 2")
+signature = "SIG_K1_Jzm7zAp2qWBkewPjSCwa4W8aFeKZS2CwJ7nMyq1u4azRLC3qdZJeEBeazaJDaGhj14FPLa8PZk36m9M3uv5M2YRW5t1HVV"
+hashedMsgBuffer = Buffer.from("9dfb36d7863716682e191695acb515c3ad3f55d7815bffe2d9404881e4643320", 'hex') 
+expectedSigningKey = "EOS8bRkmrfsQSmb87ix1EuFSe2NDsepKGCjUNgLEt1SDqw1fuhG4v"
+console.log("PUBLIC KEY RECOVERY ( EOS Library ) :");
+e = ecc.recoverHash(signature, hashedMsgBuffer);
+prefix = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(0,2);
+key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
+console.log(e + " ===> " + prefix + " + " + key );    
+assert.equal(expectedSigningKey, e)
+console.log("/////////////////////////////////////")
+
+console.log("/////////////////////////////////////")
+console.log("verify signature from jungle2 testnet block 10K")
+signature = "SIG_K1_JwpBdEU3hAq4rAWC53gDdJu8kHzR69nb3JTvpQmBqRDukVLretwjBQKdXyrP7yshonrPjMUj7L91xnFdT5jfE52DBSFtep"
+hashedMsgBuffer = Buffer.from("7ffbf03183dd79aa0f8e34be48ca56b155ab5cc2d14d7ef509f878a9154c3ab6", 'hex')
+expectedSigningKey = "EOS5xfwWr4UumKm4PqUGnyCrFWYo6j5cLioNGg5yf4GgcTp2WcYxf"
+console.log("PUBLIC KEY RECOVERY ( EOS Library ) :");
+e = ecc.recoverHash(signature, hashedMsgBuffer);
+prefix = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(0,2);
+key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
+console.log(e + " ===> " + prefix + " + " + key );    
+assert.equal(expectedSigningKey, e)
 console.log("/////////////////////////////////////")

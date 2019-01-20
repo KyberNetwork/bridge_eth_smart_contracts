@@ -6,6 +6,7 @@ const keyUtils = require('eosjs-ecc/lib/key_utils.js');
 const assert = require('assert');
 const bs58 = require('bs58')
 const EthCrypto = require('eth-crypto');
+const fs = require("fs");
 
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
@@ -150,3 +151,27 @@ key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
 console.log(e + " ===> " + prefix + " + " + key );    
 assert.equal(expectedSigningKey, e)
 console.log("/////////////////////////////////////")
+
+console.log("/////////////////////////////////////")
+console.log("verify 15 signatures from jungle2 testnet - 9626 to 9793")
+schedule = JSON.parse(fs.readFileSync("new_producers.json", 'utf8'));
+producersData = JSON.parse(fs.readFileSync("producers_data.json", 'utf8'));
+for (var j = 0; j < producersData.length; j++) {
+    thisData = producersData[j]
+    signature = thisData.producer_signature;
+    hashedMsgBuffer = thisData.signed_final_hash;
+    for (i = 0; i < schedule.producers.length; i++) {
+        if (schedule.producers[i].producer_name == thisData.producer) {
+            expectedSigningKey = schedule.producers[i].block_signing_key
+            break
+        }
+    }
+    console.log("PUBLIC KEY RECOVERY ( EOS Library ) :");
+    e = ecc.recoverHash(signature, hashedMsgBuffer);
+    prefix = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(0,2);
+    key = keyUtils.checkDecode(e.slice(3)).toString('hex').slice(2);
+    console.log(e + " ===> " + prefix + " + " + key );    
+    assert.equal(expectedSigningKey, e)
+}
+console.log("/////////////////////////////////////")
+

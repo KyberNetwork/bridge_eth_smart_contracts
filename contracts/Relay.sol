@@ -18,6 +18,8 @@ contract Relay {
     uint constant OR_MASK =   0x8000000000000000000000000000000000000000000000000000000000000000;
     uint constant AND_MASK =  0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
+    bytes32[15] public pubKeys;
+
     function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
     {
         require(bs.length >= start + size, "slicing out of range");
@@ -151,6 +153,54 @@ contract Relay {
             (calcAddress == claimedSignerAddress)                 // signer signed the given block data 
         );
     }
+
+
+//////////////////////////////////////////////////
+
+    // this is a temporary function. in the future the storing schedule will be validated.
+    function storeSchedule(bytes32[15] calldata inputPubKeys) external {
+        for( uint idx = 0; idx < inputPubKeys.length; idx++) {
+            pubKeys[idx] = inputPubKeys[idx];
+        }
+    }
+
+    function verifyBlockBasedOnSchedule(
+        bytes memory blockHeaders,
+        uint[] memory blockHeaderSizes// ,
+        //bytes32[15] memory blockMerkleHash,
+        //bytes memory pendingSchedule, /* assuming same pending schedule for all blocks */
+        //uint8[15] memory sigV,
+        //bytes32[15] memory sigR,
+        //bytes32[15] memory sigS,
+        //bytes32[15] memory claimedSignerPubKey
+    )
+        public
+        returns (bool)  {
+
+        uint offset = 0;
+        uint size;
+        bytes memory x;
+        for (uint idx = 0; idx < blockHeaderSizes.length; idx++) {
+            size = blockHeaderSizes[idx];
+            require(blockHeaders.length >= offset + size, "slicing out of range");
+            assembly { x := mload(add(blockHeaders, add(size, offset))) }
+            offset = offset + size;
+        }
+
+        // for each
+
+        // verify signed by a unique producer
+
+        // verify verify links to previous block
+
+        return true;
+    }
+
+
+
+
+
+//////////////////////////////////////////////////
 
     function makeCanonicalLeft(bytes32 self) internal pure returns (bytes32) {
         return (bytes32)((uint)(self) & AND_MASK);

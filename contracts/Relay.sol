@@ -166,12 +166,13 @@ contract Relay {
 
     function verifyBlockBasedOnSchedule(
         bytes memory blockHeaders,
-        uint[] memory blockHeaderSizes// ,
-        //bytes32[15] memory blockMerkleHash,
-        //bytes memory pendingSchedule, /* assuming same pending schedule for all blocks */
-        //uint8[15] memory sigV,
-        //bytes32[15] memory sigR,
-        //bytes32[15] memory sigS,
+        uint[] memory blockHeaderSizes,
+        bytes32[] memory blockMerklePaths,
+        uint[] memory blockMerklePathSizes,
+        bytes32[] memory pendingScheduleHashes,
+        uint8[15] memory sigVs,
+        bytes32[15] memory sigRs,
+        bytes32[15] memory sigSs
         //bytes32[15] memory claimedSignerPubKey
     )
         public

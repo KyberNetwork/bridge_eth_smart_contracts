@@ -18,7 +18,8 @@ contract Relay {
     uint constant OR_MASK =   0x8000000000000000000000000000000000000000000000000000000000000000;
     uint constant AND_MASK =  0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
-    bytes32[15] public pubKeys;
+    bytes32[21] public pubKeys;
+    uint public scheduleVersion;
 
     function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
     {
@@ -158,7 +159,10 @@ contract Relay {
 //////////////////////////////////////////////////
 
     // this is a temporary function. in the future the storing schedule will be validated.
-    function storeSchedule(bytes32[15] calldata inputPubKeys) external {
+    function storeSchedule(
+        uint scheduleVersion,
+        bytes32[21] memory inputPubKeys
+    ) public {
         for( uint idx = 0; idx < inputPubKeys.length; idx++) {
             pubKeys[idx] = inputPubKeys[idx];
         }
@@ -172,8 +176,8 @@ contract Relay {
         bytes32[] memory pendingScheduleHashes,
         uint8[15] memory sigVs,
         bytes32[15] memory sigRs,
-        bytes32[15] memory sigSs
-        //bytes32[15] memory claimedSignerPubKey
+        bytes32[15] memory sigSs,
+        uint[15] memory claimedKeyIndices
     )
         public
         returns (bool)  {

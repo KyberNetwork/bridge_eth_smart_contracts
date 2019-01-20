@@ -168,7 +168,26 @@ contract("Relay", async accounts => {
         const relay = await Relay.new()
 
         let newProducersData = JSON.parse(fs.readFileSync("new_producers.json", 'utf8'));
-        
+        let version = newProducersData.version
+        let publicKeys = []
+        let producerNames = [] // for now not passed on chain
+        let namesToKeys = {}; // for now not passed on chain
+        let namesToIdx = {} // for now not passed on chain
+        for (var j = 0; j < newProducersData.producers.length; j++) {
+            thisData = newProducersData.producers[j]
+            expectedSigningKey = thisData.block_signing_key
+            expectedSigningKeyHex = (bs58.decode(expectedSigningKey.slice(3))).slice(1,33) // remove "EOS", first byte afterwards and last 4 bytes of checksum
+            publicKeys.push(expectedSigningKeyHex)
+
+            producerNames.push(thisData.producer_name)
+            namesToKeys[thisData.producer_name] = expectedSigningKeyHex
+            namesToIdx[thisData.producer_name] = j
+        }
+        //console.log("publicKeys", publicKeys)
+        //console.log("namesToKeys", namesToKeys)
+        //console.log("namesToIdx", namesToIdx)
+
+        await relay.storeSchedule(version, publicKeys)
 
         let blockHeaders = "0x"
         let blockHeaderSizes = []
@@ -179,6 +198,7 @@ contract("Relay", async accounts => {
         let sigRs = []
         let sigSs = []
         let v,r,s
+        let claimedKeyIndices = []
 
         let producersData = JSON.parse(fs.readFileSync("producers_data.json", 'utf8'));
         for (var j = 0; j < producersData.length; j++) {
@@ -192,8 +212,10 @@ contract("Relay", async accounts => {
             sigVs.push(arr[0])
             sigRs.push(arr[1])
             sigSs.push(arr[2])
+            claimedKeyIndices.push(namesToIdx[thisData.producer])
         }
 
+        console.log("claimedKeyIndices", claimedKeyIndices)
         //console.log("blockMerklePaths", blockMerklePaths)
         //console.log("blockMerklePathSizes", blockMerklePathSizes)
         //console.log("sigVs", sigVs)
@@ -209,8 +231,8 @@ contract("Relay", async accounts => {
                 pendingScheduleHashes,
                 sigVs,
                 sigRs,
-                sigSs
-                //[] //bytes32[15] memory claimedSignerPubKey
+                sigSs,
+                claimedKeyIndices
         )
     });
     

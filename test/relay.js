@@ -169,28 +169,35 @@ contract("Relay", async accounts => {
 
         let newProducersData = JSON.parse(fs.readFileSync("new_producers.json", 'utf8'));
         let version = newProducersData.version
-        let publicKeys = []
+        let publicKeysForPython = []
         let producerNames = [] // for now not passed on chain
+        let fullKeys = [] // for now not passed on chain
         let namesToKeys = {}; // for now not passed on chain
         let namesToIdx = {} // for now not passed on chain
+
+        // prepare inputs for python uncompressed_keys.json manufacture
         for (var j = 0; j < newProducersData.producers.length; j++) {
             thisData = newProducersData.producers[j]
             expectedSigningKey = thisData.block_signing_key
             expectedSigningKeyHex = (bs58.decode(expectedSigningKey.slice(3))).slice(1,33) // remove "EOS", first byte afterwards and last 4 bytes of checksum
-            publicKeys.push(expectedSigningKeyHex)
-
+            
+            publicKeysForPython.push(bs58.decode(expectedSigningKey.slice(3)).toString("hex"))
+            // using the above array and uncompress.py script uncompressed_keys.json have been created 
             producerNames.push(thisData.producer_name)
             namesToKeys[thisData.producer_name] = expectedSigningKeyHex
+            
             namesToIdx[thisData.producer_name] = j
         }
-        //console.log("publicKeys", publicKeys)
-        //console.log("namesToKeys", namesToKeys)
-        //console.log("namesToIdx", namesToIdx)
 
-        await relay.storeSchedule(version, publicKeys)
+        // store schedule temporarily
+        let uncompressed_keys = JSON.parse(fs.readFileSync("uncompressed_keys.json", 'utf8'));
+        await relay.storeSchedule(version,
+                                  uncompressed_keys["first_parts"],
+                                  uncompressed_keys["second_parts"])
 
         let blockHeaders = "0x"
         let blockHeaderSizes = []
+        let blockMerkleHashs = []
         let blockMerklePaths = []
         let blockMerklePathSizes = []
         let pendingScheduleHashes = []
@@ -205,6 +212,7 @@ contract("Relay", async accounts => {
             thisData = producersData[j]
             blockHeaders = blockHeaders + thisData.raw_header
             blockHeaderSizes.push(thisData.raw_header.length / 2)
+            blockMerkleHashs.push("0x" + thisData.block_mroot)
             blockMerklePaths = blockMerklePaths.concat(add0xToAllItems(thisData.proof_path))
             blockMerklePathSizes.push(thisData.proof_path.length)
             pendingScheduleHashes.push("0x" + thisData.pending_schedule_hash)
@@ -213,9 +221,11 @@ contract("Relay", async accounts => {
             sigRs.push(arr[1])
             sigSs.push(arr[2])
             claimedKeyIndices.push(namesToIdx[thisData.producer])
+            
         }
 
-        console.log("claimedKeyIndices", claimedKeyIndices)
+        console.log("blockHeaders", blockHeaders)
+        console.log("blockHeaderSizes[0]", blockHeaderSizes[0])
         //console.log("blockMerklePaths", blockMerklePaths)
         //console.log("blockMerklePathSizes", blockMerklePathSizes)
         //console.log("sigVs", sigVs)
@@ -226,14 +236,16 @@ contract("Relay", async accounts => {
         const valid = await relay.verifyBlockBasedOnSchedule(
                 blockHeaders,
                 blockHeaderSizes,
+                blockMerkleHashs,
                 blockMerklePaths,
                 blockMerklePathSizes,
-                pendingScheduleHashes,
-                sigVs,
-                sigRs,
-                sigSs,
-                claimedKeyIndices
+                pendingScheduleHashes//,
+                //sigVs,
+                //sigRs,
+                //sigSs,
+                //claimedKeyIndices
         )
+        console.log("valid", valid)
     });
     
     

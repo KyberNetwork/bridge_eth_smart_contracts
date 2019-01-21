@@ -18,7 +18,8 @@ contract Relay {
     uint constant OR_MASK =   0x8000000000000000000000000000000000000000000000000000000000000000;
     uint constant AND_MASK =  0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
-    bytes32[21] public pubKeys;
+    bytes32[21] public pubKeysFirstParts;
+    bytes32[21] public pubKeysSecondParts;
     uint public scheduleVersion;
 
     function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
@@ -158,47 +159,80 @@ contract Relay {
 
 //////////////////////////////////////////////////
 
+    function verifyBlockSig2(
+        bytes memory blockHeader,
+        bytes32 blockMerkleHash,
+        bytes32 pendingScheduleHash,
+        uint8 sigV,
+        bytes32 sigR,
+        bytes32 sigS,
+        bytes32 claimedSignerPubKeyFirst,
+        bytes32 claimedSignerPubKeySecond
+    )
+        public
+        pure
+        returns (bool) 
+    {
+        bytes32 pairHash = sha256(abi.encodePacked(sha256(blockHeader), blockMerkleHash));
+        return true;
+        /*
+        bytes32 finalHash = sha256(abi.encodePacked(pairHash, pendingScheduleHash));
+        address calcAddress = ecrecover(finalHash, sigV, sigR, sigS);
+        address claimedSignerAddress = address(
+            (uint)(keccak256(abi.encodePacked(claimedSignerPubKeyFirst, claimedSignerPubKeySecond))) & (2**(8*21)-1)
+        );
+
+        return ( calcAddress == claimedSignerAddress ); // signer signed the given block data
+        */
+    }
+
     // this is a temporary function. in the future the storing schedule will be validated.
     function storeSchedule(
-        uint scheduleVersion,
-        bytes32[21] memory inputPubKeys
+        uint inputScheduleVersion,
+        bytes32[21] memory inputPubKeysFirstParts,
+        bytes32[21] memory inputPubKeysSecondParts
     ) public {
-        for( uint idx = 0; idx < inputPubKeys.length; idx++) {
-            pubKeys[idx] = inputPubKeys[idx];
+        scheduleVersion = inputScheduleVersion;
+        for( uint idx = 0; idx < 21; idx++) {
+            pubKeysFirstParts[idx] = inputPubKeysFirstParts[idx];
+            pubKeysSecondParts[idx] = inputPubKeysSecondParts[idx]; 
         }
     }
 
     function verifyBlockBasedOnSchedule(
         bytes memory blockHeaders,
         uint[] memory blockHeaderSizes,
+        bytes32[] memory blockMerkleHashs,
         bytes32[] memory blockMerklePaths,
         uint[] memory blockMerklePathSizes,
-        bytes32[] memory pendingScheduleHashes,
-        uint8[15] memory sigVs,
-        bytes32[15] memory sigRs,
-        bytes32[15] memory sigSs,
-        uint[15] memory claimedKeyIndices
+        bytes32[] memory pendingScheduleHashes//,
+        //uint8[15] memory sigVs,
+        //bytes32[15] memory sigRs,
+        //bytes32[15] memory sigSs,
+        //uint[15] memory claimedKeyIndices
     )
         public
-        returns (bool)  {
+        // view
+        returns (bytes memory) {
 
-        uint offset = 0;
+        uint offset_in_headers = 0; 
         uint size;
-        bytes memory x;
+        uint current_size;
+        uint x;
+
         for (uint idx = 0; idx < blockHeaderSizes.length; idx++) {
-            size = blockHeaderSizes[idx];
-            require(blockHeaders.length >= offset + size, "slicing out of range");
-            assembly { x := mload(add(blockHeaders, add(size, offset))) }
-            offset = offset + size;
+            bytes memory header = getOneHeader(blockHeaders, offset_in_headers, blockHeaderSizes[idx]);
+            offset_in_headers = offset_in_headers + blockHeaderSizes[idx];
         }
 
-        // for each
+
+        // for each 
 
         // verify signed by a unique producer
 
         // verify verify links to previous block
 
-        return true;
+        // return true;
     }
 
 
@@ -206,6 +240,38 @@ contract Relay {
 
 
 //////////////////////////////////////////////////
+
+    function getOneHeader(
+        bytes memory blockHeaders,
+        uint offset_in_headers,
+        uint headerSize
+    )
+    internal
+    pure
+    returns (bytes memory) {
+        bytes memory header = new bytes(headerSize);
+        uint size = headerSize;
+        uint offset_in_header = 0;
+        uint current_size;
+        uint x;
+
+        while(size > 0) {
+            if (size >= 32) {
+                current_size = 32;
+                assembly { x := mload(add(blockHeaders,
+                                      add(current_size, add(offset_in_headers, offset_in_header)))) }
+                assembly { mstore(add(header, add(32,offset_in_header)), x) }
+            } else {
+                current_size = size;
+                for (uint i = 0; i < current_size; i++) {
+                    header[offset_in_header + i] = blockHeaders[offset_in_headers + offset_in_header + i];
+                }
+           }
+           offset_in_header = offset_in_header + current_size;
+           size = size - current_size;
+        }
+        return header;
+    }
 
     function makeCanonicalLeft(bytes32 self) internal pure returns (bytes32) {
         return (bytes32)((uint)(self) & AND_MASK);

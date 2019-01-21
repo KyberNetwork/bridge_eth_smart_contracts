@@ -41,6 +41,14 @@ function bs58pubKeyToHex(expectedSigningKeyRaw) {
     return expectedSigningKey
 }
 
+function add0xToAllItems(arr) {
+    var i, n = arr.length;
+    for (i = 0; i < n; ++i) {
+        arr[i] = "0x" + arr[i];
+    }
+    return arr;
+};
+
 const Relay = artifacts.require("Relay")
 
 contract("Relay", async accounts => {
@@ -156,41 +164,27 @@ contract("Relay", async accounts => {
         }
     });
 
-    function add0xToAllItems(arr) {
-        var i, n = arr.length;
-        for (i = 0; i < n; ++i) {
-            arr[i] = "0x" + arr[i];
-        }
-        return arr;
-    };
-    
     it("parse 15 blocks", async () => {
-        const relay = await Relay.new()
 
         let newProducersData = JSON.parse(fs.readFileSync("new_producers.json", 'utf8'));
         let version = newProducersData.version
         let publicKeysForPython = []
-        let producerNames = [] // for now not passed on chain
-        let fullKeys = [] // for now not passed on chain
-        let namesToKeys = {}; // for now not passed on chain
-        let namesToIdx = {} // for now not passed on chain
+        let namesToIdx = {}
 
         // prepare inputs for python uncompressed_keys.json manufacture
         for (var j = 0; j < newProducersData.producers.length; j++) {
             thisData = newProducersData.producers[j]
             expectedSigningKey = thisData.block_signing_key
-            expectedSigningKeyHex = (bs58.decode(expectedSigningKey.slice(3))).slice(1,33) // remove "EOS", first byte afterwards and last 4 bytes of checksum
-            
-            publicKeysForPython.push(bs58.decode(expectedSigningKey.slice(3)).toString("hex"))
-            // using the above array and uncompress.py script uncompressed_keys.json have been created 
-            producerNames.push(thisData.producer_name)
-            namesToKeys[thisData.producer_name] = expectedSigningKeyHex
-            
+            publicKeysForPython.push((bs58.decode(expectedSigningKey.slice(3)).toString("hex")).slice(0,-8))
             namesToIdx[thisData.producer_name] = j
         }
+        // using the publicKeysForPython and uncompress.py script uncompressed_keys.json have been created 
+        // remove if need to create input for python - console.log("publicKeysForPython", publicKeysForPython)
 
         // store schedule temporarily
         let uncompressed_keys = JSON.parse(fs.readFileSync("uncompressed_keys.json", 'utf8'));
+
+        const relay = await Relay.new()
         await relay.storeSchedule(version,
                                   uncompressed_keys["first_parts"],
                                   uncompressed_keys["second_parts"])
@@ -207,7 +201,7 @@ contract("Relay", async accounts => {
         let v,r,s
         let claimedKeyIndices = []
 
-        let producersData = JSON.parse(fs.readFileSync("producers_data.json", 'utf8'));
+        producersData = JSON.parse(fs.readFileSync("producers_data.json", 'utf8'));
         for (var j = 0; j < producersData.length; j++) {
             thisData = producersData[j]
             blockHeaders = blockHeaders + thisData.raw_header
@@ -221,31 +215,21 @@ contract("Relay", async accounts => {
             sigRs.push(arr[1])
             sigSs.push(arr[2])
             claimedKeyIndices.push(namesToIdx[thisData.producer])
-            
         }
 
-        console.log("blockHeaders", blockHeaders)
-        console.log("blockHeaderSizes[0]", blockHeaderSizes[0])
-        //console.log("blockMerklePaths", blockMerklePaths)
-        //console.log("blockMerklePathSizes", blockMerklePathSizes)
-        //console.log("sigVs", sigVs)
-        //console.log("sigRs", sigRs)
-        //console.log("sigSs", sigSs)
-        
-        
-        const valid = await relay.verifyBlockBasedOnSchedule(
+         const valid = await relay.verifyBlockBasedOnSchedule(
                 blockHeaders,
                 blockHeaderSizes,
                 blockMerkleHashs,
                 blockMerklePaths,
                 blockMerklePathSizes,
-                pendingScheduleHashes//,
-                //sigVs,
-                //sigRs,
-                //sigSs,
-                //claimedKeyIndices
-        )
-        console.log("valid", valid)
+                pendingScheduleHashes,
+                sigVs,
+                sigRs,
+                sigSs,
+                claimedKeyIndices)
+         assert(valid);
+
     });
     
     

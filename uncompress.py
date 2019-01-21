@@ -1,5 +1,3 @@
-from pprint import pprint
-
 def pow_mod(x, y, z):
     "Calculate (x ** y) % z efficiently."
     number = 1
@@ -28,10 +26,10 @@ compressed_key = '02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df4
 uncompressed_key = uncompress(compressed_key)
 ## should get 0414fc03b8df87cd7b872996810db8458d61da8448e531569c8517b469a119d267be5645686309c6e6736dbd93940707cc9143d3cf29f1b877ff340e2cb2d259cf
 ##print(uncompressed_key)
-
 ######################################
 
 # this is taken from "parse 15 blocks" test in relay.js 
+
 public_keys = [
   '02e65e41cb9ee12e23af44d32c337788253765eee9cd5c5b39900bf22e6d39dab1',
   '028d316c09c917eecbd8da03a695029a63dc3a4294c75c254af7d00078709b1107',
@@ -61,13 +59,12 @@ first_parts = []
 second_parts = []
 for key in public_keys:
     uncompressed = uncompress(key)
-    uncompressed_part_0 = "0x" + uncompressed[2:65]
-    uncompressed_part_1 = "0x" + uncompressed[66:129]
+    uncompressed_part_0 = "0x" + uncompressed[2:66]
+    uncompressed_part_1 = "0x" + uncompressed[66:130]
     first_parts.append(uncompressed_part_0)
     second_parts.append(uncompressed_part_1)
 uncompressed_key_parts["first_parts"] = first_parts
 uncompressed_key_parts["second_parts"] = second_parts
-# pprint(uncompressed_key_parts)
 
 import json
 with open('uncompressed_keys.json', 'w+') as outfile:

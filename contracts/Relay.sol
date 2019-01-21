@@ -159,6 +159,16 @@ contract Relay {
 
 //////////////////////////////////////////////////
 
+    event VerifyData( bytes blockHeader,
+                      bytes32 blockMerkleHash,
+                      bytes32 pendingScheduleHash,
+                      uint8 sigV,
+                      bytes32 sigR,
+                      bytes32 sigS,
+                      bytes32 claimedSignerPubKeyFirst,
+                      bytes32 claimedSignerPubKeySecond,
+                      bool verified);
+
     function verifyBlockSig2(
         bytes memory blockHeader,
         bytes32 blockMerkleHash,
@@ -170,20 +180,26 @@ contract Relay {
         bytes32 claimedSignerPubKeySecond
     )
         public
-        pure
         returns (bool) 
     {
         bytes32 pairHash = sha256(abi.encodePacked(sha256(blockHeader), blockMerkleHash));
-        return true;
-        /*
         bytes32 finalHash = sha256(abi.encodePacked(pairHash, pendingScheduleHash));
         address calcAddress = ecrecover(finalHash, sigV, sigR, sigS);
         address claimedSignerAddress = address(
             (uint)(keccak256(abi.encodePacked(claimedSignerPubKeyFirst, claimedSignerPubKeySecond))) & (2**(8*21)-1)
         );
 
+        emit VerifyData(blockHeader,
+                   blockMerkleHash,
+                   pendingScheduleHash,
+                   sigV,
+                   sigR,
+                   sigS,
+                   claimedSignerPubKeyFirst,
+                   claimedSignerPubKeySecond,
+                   calcAddress == claimedSignerAddress);
+
         return ( calcAddress == claimedSignerAddress ); // signer signed the given block data
-        */
     }
 
     // this is a temporary function. in the future the storing schedule will be validated.
@@ -205,25 +221,35 @@ contract Relay {
         bytes32[] memory blockMerkleHashs,
         bytes32[] memory blockMerklePaths,
         uint[] memory blockMerklePathSizes,
-        bytes32[] memory pendingScheduleHashes//,
-        //uint8[15] memory sigVs,
-        //bytes32[15] memory sigRs,
-        //bytes32[15] memory sigSs,
-        //uint[15] memory claimedKeyIndices
+        bytes32[] memory pendingScheduleHashes,
+        uint8[15] memory sigVs,
+        bytes32[15] memory sigRs,
+        bytes32[15] memory sigSs,
+        uint[15] memory claimedKeyIndices
     )
         public
-        // view
-        returns (bytes memory) {
+        returns (bool) {
 
         uint offset_in_headers = 0; 
-        uint size;
-        uint current_size;
-        uint x;
-
         for (uint idx = 0; idx < blockHeaderSizes.length; idx++) {
             bytes memory header = getOneHeader(blockHeaders, offset_in_headers, blockHeaderSizes[idx]);
             offset_in_headers = offset_in_headers + blockHeaderSizes[idx];
+
+            bool verified = verifyBlockSig2(
+                header,
+                blockMerkleHashs[idx],
+                pendingScheduleHashes[idx],
+                sigVs[idx],
+                sigRs[idx],
+                sigSs[idx],
+                pubKeysFirstParts[claimedKeyIndices[idx]],
+                pubKeysSecondParts[claimedKeyIndices[idx]]
+            );
+            if (!verified) {
+                return false;
+            }
         }
+        return true;
 
 
         // for each 
@@ -235,7 +261,17 @@ contract Relay {
         // return true;
     }
 
-
+    // tmp function for debug
+    function checkId(bytes memory header, uint32 blockNumber) public returns (bytes32) {
+        bytes memory result = sha256(header);
+        /*
+        block_id_type result = digest(); //fc::sha256::hash(*static_cast<const block_header*>(this));
+        result._hash[0] &= 0xffffffff00000000;
+        result._hash[0] += fc::endian_reverse_u32(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
+        return result;
+        */
+        
+    }
 
 
 

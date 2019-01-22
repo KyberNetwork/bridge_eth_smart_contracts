@@ -48,6 +48,10 @@ function add0xToAllItems(arr) {
     return arr;
 };
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const Relay = artifacts.require("Relay")
 
 contract("Relay", async accounts => {
@@ -82,25 +86,31 @@ contract("Relay", async accounts => {
         let publicKeysForPython = []
         let namesToIdx = {}
 
-        // prepare inputs for python uncompressed_keys.json manufacture
+        // start manufacturing uncompressed keys from compressed ones (dumped from c++ program)
         for (var j = 0; j < newProducersData.producers.length; j++) {
             thisData = newProducersData.producers[j]
             expectedSigningKey = thisData.block_signing_key
             publicKeysForPython.push((bs58.decode(expectedSigningKey.slice(3)).toString("hex")).slice(0,-8))
             namesToIdx[thisData.producer_name] = j
         }
+        let publicKeysForPythonAsJson = JSON.stringify(publicKeysForPython);
+        fs.writeFile('tmp_keys_for_python.json', publicKeysForPythonAsJson, 'utf8');
 
-        // using the publicKeysForPython and uncompress.py script uncompressed_keys.json have been created 
-        // remove if need to create input for python - console.log("publicKeysForPython", publicKeysForPython)
+        await sleep(500)
+        require("child_process").execSync('python uncompress.py')
+        await sleep(500)
+        fs.unlink("tmp_keys_for_python.json") // delete the we created earlier 
+
+        let uncompressed_keys = JSON.parse(fs.readFileSync("uncompressed_keys.json", 'utf8'));
+        fs.unlink("uncompressed_keys.json") // delete also the file that the python script created 
 
         // store schedule temporarily
-        let uncompressed_keys = JSON.parse(fs.readFileSync("uncompressed_keys.json", 'utf8'));
-
         const relay = await Relay.new()
         await relay.storeSchedule(version,
                                   uncompressed_keys["first_parts"],
                                   uncompressed_keys["second_parts"])
 
+        // read relevant headers data (dumped from c++ program)
         let blockHeaders = "0x"
         let blockHeaderSizes = []
         let blockMerkleHashs = []
@@ -129,17 +139,18 @@ contract("Relay", async accounts => {
             claimedKeyIndices.push(namesToIdx[thisData.producer])
         }
 
-         const valid = await relay.verifyBlockBasedOnSchedule(
-                blockHeaders,
-                blockHeaderSizes,
-                blockMerkleHashs,
-                blockMerklePaths,
-                blockMerklePathSizes,
-                pendingScheduleHashes,
-                sigVs,
-                sigRs,
-                sigSs,
-                claimedKeyIndices)
+        // actually verify the block
+        const valid = await relay.verifyBlockBasedOnSchedule(
+            blockHeaders,
+            blockHeaderSizes,
+            blockMerkleHashs,
+            blockMerklePaths,
+            blockMerklePathSizes,
+            pendingScheduleHashes,
+            sigVs,
+            sigRs,
+            sigSs,
+            claimedKeyIndices)
          assert(valid);
 
     });

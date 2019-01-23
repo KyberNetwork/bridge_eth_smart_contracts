@@ -12,24 +12,26 @@ contract Relay is HeaderParser {
         bytes32[] blockMerklePaths;
         uint[] blockMerklePathSizes;
         bytes32[] pendingScheduleHashs;
-        uint8[15] sigVs;
-        bytes32[15] sigRs;
-        bytes32[15] sigSs;
-        uint[15] claimedKeyIndices;
+        uint8[] sigVs;
+        bytes32[] sigRs;
+        bytes32[] sigSs;
+        uint[] claimedKeyIndices;
     }
 
     bytes32[21] public pubKeysFirstParts;
     bytes32[21] public pubKeysSecondParts;
+    uint numProducers;
     uint public scheduleVersion;
 
-    // this is a temporary function. in the future the storing schedule will be validated.
     function storeInitialSchedule(
         uint inputScheduleVersion,
-        bytes32[21] memory inputPubKeysFirstParts,
-        bytes32[21] memory inputPubKeysSecondParts
+        bytes32[] memory inputPubKeysFirstParts,
+        bytes32[] memory inputPubKeysSecondParts,
+        uint numKeys
     ) public {
         scheduleVersion = inputScheduleVersion;
-        for( uint idx = 0; idx < 21; idx++) {
+        numProducers = numKeys;
+        for( uint idx = 0; idx < numKeys; idx++) {
             pubKeysFirstParts[idx] = inputPubKeysFirstParts[idx];
             pubKeysSecondParts[idx] = inputPubKeysSecondParts[idx]; 
         }
@@ -43,11 +45,11 @@ contract Relay is HeaderParser {
         bytes32[] memory blockMerklePaths,
         uint[] memory blockMerklePathSizes,
         bytes32[] memory pendingScheduleHashs,
-        uint8[15] memory sigVs,
-        bytes32[15] memory sigRs,
-        bytes32[15] memory sigSs,
-        uint[15] memory claimedKeyIndices,
-        bytes32[21] memory completingKeyParts
+        uint8[] memory sigVs,
+        bytes32[] memory sigRs,
+        bytes32[] memory sigSs,
+        uint[] memory claimedKeyIndices,
+        bytes32[] memory completingKeyParts
         
     ) public {
        HeadersData memory headersData = HeadersData({
@@ -74,10 +76,10 @@ contract Relay is HeaderParser {
         bytes32[] memory blockMerklePaths,
         uint[] memory blockMerklePathSizes,
         bytes32[] memory pendingScheduleHashs,
-        uint8[15] memory sigVs,
-        bytes32[15] memory sigRs,
-        bytes32[15] memory sigSs,
-        uint[15] memory claimedKeyIndices
+        uint8[] memory sigVs,
+        bytes32[] memory sigRs,
+        bytes32[] memory sigSs,
+        uint[] memory claimedKeyIndices
     )
         public
         view
@@ -101,7 +103,7 @@ contract Relay is HeaderParser {
 
     function storeNewSchedule(
         bytes memory blockHeaders,
-        bytes32[21] memory completingKeyParts
+        bytes32[] memory completingKeyParts
     )
         internal
         returns (bool)
@@ -115,12 +117,16 @@ contract Relay is HeaderParser {
         /* assuming first block is the new producers block, so no need to separate it */
         (version, amount, producerNames, producerCompressedKeys) = parseNonFixedFields(blockHeaders);
 
+        require(amount == producerCompressedKeys.length);
+
         /* write new schedule to storage */ 
         scheduleVersion = version;
         for (uint idx = 0; idx < producerCompressedKeys.length; idx++) {
             pubKeysFirstParts[idx] = producerCompressedKeys[idx];
             pubKeysSecondParts[idx] = completingKeyParts[idx];
         }
+
+        return true;
     }
 
     function doVerifyBlockBasedOnSchedule(HeadersData memory headersData) internal view returns (bool) {
@@ -128,6 +134,8 @@ contract Relay is HeaderParser {
         uint pathOffset = 0;
         bytes32 currentId;
         bytes32 previousId = "";
+
+        // TODO: make sure enough unique blocks were given.
         for (uint idx = 0; idx < headersData.blockHeaderSizes.length; idx++) {
             bytes memory header = getOneHeader(
                 headersData.blockHeaders,
@@ -146,14 +154,15 @@ contract Relay is HeaderParser {
             if (!valid) return false;
 
             currentId = getIdFromHeader(header);
+            uint pathSize = headersData.blockMerklePathSizes[idx];
             if(previousId != "") {
-                uint pathSize = headersData.blockMerklePathSizes[idx];
                 bytes32[] memory path = getOnePath(headersData.blockMerklePaths, pathOffset, pathSize);
-                pathOffset = pathOffset + pathSize;
 
                 valid = proofIsValid(previousId, path, headersData.blockMerkleHashs[idx]);
                 if (!valid) return false;
             }
+            pathOffset = pathOffset + pathSize;
+
             previousId = currentId;
         }
 

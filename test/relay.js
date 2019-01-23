@@ -56,7 +56,7 @@ const Relay = artifacts.require("Relay")
 
 contract("Relay", async accounts => {
 
-    it("parse header", async () => {
+    xit("parse header", async () => {
         // this includes new producers:
         headerRaw = "[ 95 18 79 47 00 00 00 00 00 ea 30 55 00 00 00 00 00 01 bc f2 f4 48 22 5d 09 96 85 f1 4d a7 68 03 02 89 26 af 04 d2 60 7e af cf 60 9c 26 5c 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 74 7d 10 3e 24 c9 6d eb 1b ee bc 13 eb 31 f7 c2 18 81 26 94 6c 86 77 df d1 69 1a f9 f9 c0 3a b1 00 00 00 00 01 57 01 00 00 04 00 00 00 00 00 ea 30 55 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 00 73 a2 c9 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 80 49 af f1 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 00 00 00 80 69 a2 73 00 02 c0 de d2 bc 1f 13 05 fb 0f aa c5 e6 c0 3e e3 a1 92 42 34 98 54 27 b6 16 7c a5 69 d1 3d f4 35 cf 00 ]"
         header = "0x" + toBuffer(headerRaw).toString("hex")
@@ -106,9 +106,10 @@ contract("Relay", async accounts => {
 
         // store schedule temporarily
         const relay = await Relay.new()
-        await relay.storeSchedule(version,
-                                  uncompressed_keys["first_parts"],
-                                  uncompressed_keys["second_parts"])
+        await relay.storeInitialSchedule(
+            version,
+            uncompressed_keys["first_parts"],
+            uncompressed_keys["second_parts"])
 
         // read relevant headers data (dumped from c++ program)
         let blockHeaders = "0x"

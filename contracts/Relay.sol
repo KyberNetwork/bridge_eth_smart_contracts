@@ -23,7 +23,7 @@ contract Relay is HeaderParser {
     uint public scheduleVersion;
 
     // this is a temporary function. in the future the storing schedule will be validated.
-    function storeSchedule(
+    function storeInitialSchedule(
         uint inputScheduleVersion,
         bytes32[21] memory inputPubKeysFirstParts,
         bytes32[21] memory inputPubKeysSecondParts
@@ -33,6 +33,38 @@ contract Relay is HeaderParser {
             pubKeysFirstParts[idx] = inputPubKeysFirstParts[idx];
             pubKeysSecondParts[idx] = inputPubKeysSecondParts[idx]; 
         }
+    }
+
+    /* verify blocks have been built on the new producers block and store new schedule */
+    function changeSchedule(
+        bytes memory blockHeaders,
+        uint[] memory blockHeaderSizes,
+        bytes32[] memory blockMerkleHashs,
+        bytes32[] memory blockMerklePaths,
+        uint[] memory blockMerklePathSizes,
+        bytes32[] memory pendingScheduleHashs,
+        uint8[15] memory sigVs,
+        bytes32[15] memory sigRs,
+        bytes32[15] memory sigSs,
+        uint[15] memory claimedKeyIndices,
+        bytes32[21] memory completingKeyParts
+        
+    ) public {
+       HeadersData memory headersData = HeadersData({
+            blockHeaders:blockHeaders,
+            blockHeaderSizes:blockHeaderSizes,
+            blockMerkleHashs:blockMerkleHashs,
+            blockMerklePaths:blockMerklePaths,
+            blockMerklePathSizes:blockMerklePathSizes,
+            pendingScheduleHashs:pendingScheduleHashs,
+            sigVs:sigVs,
+            sigRs:sigRs,
+            sigSs:sigSs,
+            claimedKeyIndices:claimedKeyIndices
+        });
+
+        require(doVerifyBlockBasedOnSchedule(headersData));
+        require(storeNewSchedule(blockHeaders, completingKeyParts));
     }
 
     function verifyBlockBasedOnSchedule(
@@ -65,6 +97,30 @@ contract Relay is HeaderParser {
         });
 
         return doVerifyBlockBasedOnSchedule(headersData);
+    }
+
+    function storeNewSchedule(
+        bytes memory blockHeaders,
+        bytes32[21] memory completingKeyParts
+    )
+        internal
+        returns (bool)
+    {
+        uint32 version;
+        uint8 amount;
+        uint64[21] memory producerNames;
+        bytes32[21] memory producerCompressedKeys;
+
+        /* TODO: must get v part as well? */
+        /* assuming first block is the new producers block, so no need to separate it */
+        (version, amount, producerNames, producerCompressedKeys) = parseNonFixedFields(blockHeaders);
+
+        /* write new schedule to storage */ 
+        scheduleVersion = version;
+        for (uint idx = 0; idx < producerCompressedKeys.length; idx++) {
+            pubKeysFirstParts[idx] = producerCompressedKeys[idx];
+            pubKeysSecondParts[idx] = completingKeyParts[idx];
+        }
     }
 
     function doVerifyBlockBasedOnSchedule(HeadersData memory headersData) internal view returns (bool) {

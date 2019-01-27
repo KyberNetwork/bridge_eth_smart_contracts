@@ -63,11 +63,11 @@ contract HeaderParser {
     {
         uint offset = 78;
 
-        schedule = reverseBytes((uint32)(sliceBytes(blockHeader, offset, SCHEDULE_BYTES)));
-        offset = offset + SCHEDULE_BYTES;
-
         action_mroot = (uint256)(sliceBytes(blockHeader, offset, ACTION_MROOT_BYTES));
         offset = offset + ACTION_MROOT_BYTES;
+
+        schedule = reverseBytes((uint32)(sliceBytes(blockHeader, offset, SCHEDULE_BYTES)));
+        offset = offset + SCHEDULE_BYTES;
 
         have_new_producers = (uint8)(sliceBytes(blockHeader, offset, HAVE_NEW_PRODUCERS_BYTES));
         offset = offset + HAVE_NEW_PRODUCERS_BYTES;

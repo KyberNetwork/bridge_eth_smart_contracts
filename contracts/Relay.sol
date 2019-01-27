@@ -155,15 +155,16 @@ contract Relay is HeaderParser {
 
             currentId = getIdFromHeader(header);
             uint pathSize = headersData.blockMerklePathSizes[idx];
-            if(previousId != "") {
+            if (previousId != "") {
                 bytes32[] memory path = getOnePath(headersData.blockMerklePaths, pathOffset, pathSize);
 
                 valid = proofIsValid(previousId, path, headersData.blockMerkleHashs[idx]);
                 if (!valid) return false;
             }
             pathOffset = pathOffset + pathSize;
-
             previousId = currentId;
+
+            if (scheduleVersion != (uint)(getScheduleVersionFromHeader(header))) return false;
         }
 
         return true;
@@ -207,6 +208,12 @@ contract Relay is HeaderParser {
         uint previous = (uint256)(sliceBytes(header, offset, PREVIOUS_BYTES));
         uint blockNum = getBlockNumFromId((bytes32)(previous)) + 1;
         return getId(header, blockNum);
+    }
+
+    function getScheduleVersionFromHeader(bytes memory header) internal pure returns (uint32) {
+        uint offset = 78 + ACTION_MROOT_BYTES;
+        uint32 schedule = reverseBytes((uint32)(sliceBytes(header, offset, SCHEDULE_BYTES)));
+        return schedule;
     }
 
     function getOneHeader(

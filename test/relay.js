@@ -174,7 +174,7 @@ contract("Relay", async accounts => {
         // get headers building on top of block 9626 (from c++) and use them to validate that block
         headersData = await getHeadersData("headers_9626.json", namesToIdxSchedule2)
 
-        valid = await relay.verifyBlockBasedOnSchedule(
+        await relay.verifyBlockBasedOnSchedule(
             headersData.blockHeaders,
             headersData.blockHeaderSizes,
             headersData.blockMerkleHashs,
@@ -185,6 +185,36 @@ contract("Relay", async accounts => {
             headersData.sigRs,
             headersData.sigSs,
             headersData.claimedKeyIndices)
-         assert(valid);
+
+        // get headers building on top of block 10800 (from c++) and use them to validate that block
+        headersData = await getHeadersData("headers_10800.json", namesToIdxSchedule2)
+
+        await relay.verifyBlockBasedOnSchedule(
+            headersData.blockHeaders,
+            headersData.blockHeaderSizes,
+            headersData.blockMerkleHashs,
+            headersData.blockMerklePaths,
+            headersData.blockMerklePathSizes,
+            headersData.pendingScheduleHashes,
+            headersData.sigVs,
+            headersData.sigRs,
+            headersData.sigSs,
+            headersData.claimedKeyIndices)
+
+        lirb = await relay.lastIrreversibleBlock()
+        await relay.verifyAction(
+            lirb,
+        bytes memory blockHeader,
+        bytes32 blockMerkleHash,
+        bytes32[] memory blockMerklePath,
+        uint blockMerklePathSize,
+        bytes32 pendingScheduleHash,
+        uint8 sigV,
+        bytes32 sigR,
+        bytes32 sigS,
+        uint claimedKeyIndex,
+        bytes32[] memory actionPath,
+        bytes32 actionRecieptDigest
+
     });
 })

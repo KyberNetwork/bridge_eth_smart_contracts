@@ -22,6 +22,9 @@ contract Relay is HeaderParser {
     bytes32[21] public pubKeysSecondParts;
     uint numProducers;
     uint public scheduleVersion;
+    uint public lastIrreversibleBlock;
+    mapping(uint=>bool) public isBlockIrreversible;
+    mapping(uint=>bytes) public irreversibleBlockHeaders;
 
     function storeInitialSchedule(
         uint inputScheduleVersion,
@@ -82,7 +85,6 @@ contract Relay is HeaderParser {
         uint[] memory claimedKeyIndices
     )
         public
-        view
         returns (bool)
     {
         HeadersData memory headersData = HeadersData({
@@ -98,7 +100,8 @@ contract Relay is HeaderParser {
             claimedKeyIndices:claimedKeyIndices
         });
 
-        return doVerifyBlockBasedOnSchedule(headersData);
+        require(doVerifyBlockBasedOnSchedule(headersData));
+        require(storeHeader(headersData));
     }
 
     function storeNewSchedule(
@@ -127,6 +130,41 @@ contract Relay is HeaderParser {
         }
 
         return true;
+    }
+
+    function verifyAction(
+        uint irreversibleBlockToReference,
+        bytes memory blockHeader,
+        bytes32 blockMerkleHash,
+        bytes32[] memory blockMerklePath,
+        uint blockMerklePathSize,
+        bytes32 pendingScheduleHash,
+        uint8 sigV,
+        bytes32 sigR,
+        bytes32 sigS,
+        uint claimedKeyIndex,
+        bytes32[] memory actionPath,
+        bytes32 actionRecieptDigest // calculated offchain from action parameters
+    )
+        public
+        view
+        returns (bool)
+    {
+        /* verify block sig
+        bool valid = verifyBlockSig(
+            blockHeader,
+            headersData,
+            idx,
+            pubKeysFirstParts[headersData.claimedKeyIndices[idx]],
+            pubKeysSecondParts[headersData.claimedKeyIndices[idx]]
+        );
+        if (!valid) return false;
+        */
+
+        /* make sure the blockis linked to an irreversible bloc */
+        /* .... */
+
+        /* verify action path */
     }
 
     function doVerifyBlockBasedOnSchedule(HeadersData memory headersData) internal view returns (bool) {
@@ -170,6 +208,18 @@ contract Relay is HeaderParser {
         return true;
     }
 
+    function storeHeader(HeadersData memory headersData) internal returns (bool) {
+        /* TODO: avoid current duplication as first header + id are already read when verifying */
+        bytes memory header = getOneHeader(headersData.blockHeaders, 0, headersData.blockHeaderSizes[0]);
+        uint blockNum = getBlockNumFromHeader(header);
+
+        isBlockIrreversible[blockNum] = true;
+        irreversibleBlockHeaders[blockNum] = header;
+        if (blockNum > lastIrreversibleBlock) lastIrreversibleBlock = blockNum;
+
+        return true;
+    }
+
     function verifyBlockSig(
         bytes memory blockHeader,
         HeadersData memory headersData,
@@ -203,10 +253,14 @@ contract Relay is HeaderParser {
         return ((uint)(id) >> (256 - 32));
     }
 
-    function getIdFromHeader(bytes memory header) internal pure returns (bytes32) {
+    function getBlockNumFromHeader(bytes memory header) internal pure returns (uint) {
         uint offset = TIMESTAMP_BYTES + PRODUCER_BYTES + CONFIRMED_BYTES;
         uint previous = (uint256)(sliceBytes(header, offset, PREVIOUS_BYTES));
-        uint blockNum = getBlockNumFromId((bytes32)(previous)) + 1;
+        return getBlockNumFromId((bytes32)(previous)) + 1;
+    }
+
+    function getIdFromHeader(bytes memory header) internal pure returns (bytes32) {
+        uint blockNum =getBlockNumFromHeader(header);
         return getId(header, blockNum);
     }
 

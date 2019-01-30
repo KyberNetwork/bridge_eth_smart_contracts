@@ -15,8 +15,6 @@ contract HeaderParser {
     uint constant PRODUCERS_NAME_BYTES          = 8;
     uint constant PRODUCERS_AMOUNT_BYTES        = 1;
     uint constant PRODUCERS_KEY_HIGH_BYTES      = 32;
-    uint constant OR_MASK =   0x8000000000000000000000000000000000000000000000000000000000000000;
-    uint constant AND_MASK =  0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     function sliceBytes(bytes memory bs, uint start, uint size) internal pure returns (uint)
     {
@@ -123,4 +121,40 @@ contract HeaderParser {
             (version, amount, producerNames, producerKeyHighChunk) = parseNonFixedFields(blockHeader);
         }
     }
+
+    function getBlockNumFromHeader(bytes memory header) internal pure returns (uint) {
+        uint offset = TIMESTAMP_BYTES + PRODUCER_BYTES + CONFIRMED_BYTES;
+        bytes32 previous = (bytes32)(sliceBytes(header, offset, PREVIOUS_BYTES));
+        return getBlockNumFromId((bytes32)(previous)) + 1;
+    }
+
+    function getIdFromHeader(bytes memory header) internal pure returns (bytes32) {
+        uint blockNum =getBlockNumFromHeader(header);
+        return headerToId(header, blockNum);
+    }
+
+    function getScheduleVersionFromHeader(bytes memory header) internal pure returns (uint32) {
+        uint offset = 78 + ACTION_MROOT_BYTES;
+        uint32 schedule = reverseBytes((uint32)(sliceBytes(header, offset, SCHEDULE_BYTES)));
+        return schedule;
+    }
+
+    function getActionMrootFromHeader(bytes memory header) internal pure returns (bytes32) {
+        uint offset = 78;
+        bytes32 actionMroot = (bytes32)(sliceBytes(header, offset, ACTION_MROOT_BYTES));
+        return actionMroot;
+    }
+
+        function headerToId(bytes memory header, uint blockNum) internal pure returns (bytes32) {
+        bytes32 headerHash = sha256(header);
+        uint blockNumShifted = blockNum << (256 - 32);
+        uint mask = ((2**(256 - 32))-1);
+        uint result = ((uint)(headerHash) & mask) | blockNumShifted;
+        return (bytes32)(result);
+    }
+
+    function getBlockNumFromId(bytes32 id) internal pure returns (uint) {
+        return ((uint)(id) >> (256 - 32));
+    }
+
 }

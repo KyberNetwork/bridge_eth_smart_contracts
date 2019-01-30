@@ -1,9 +1,10 @@
 pragma solidity 0.5.0;
 
 import "./HeaderParser.sol";
+import "./MerkleProof.sol";
 
 
-contract Relay is HeaderParser {
+contract Relay is HeaderParser, MerkleProof {
 
     struct HeadersData {
         bytes blockHeaders;
@@ -32,11 +33,16 @@ contract Relay is HeaderParser {
         bytes32 actionRecieptDigest;
     }
 
-    bytes32[21] public pubKeysFirstParts;
-    bytes32[21] public pubKeysSecondParts;
+    /* globals */ 
     uint public numProducers;
     uint public scheduleVersion;
     uint public lastIrreversibleBlock;
+
+    /* per Schedule */
+    mapping(uint=>bytes32[21]) public pubKeysFirstPartsPerSchedule;
+    mapping(uint=>bytes32[21]) public pubKeysSecondPartsPerSchedule;
+
+    /* per relayed block */
     mapping(uint=>bool) public isBlockIrreversible;
     mapping(uint=>bytes) public irreversibleBlockHeaders;
     mapping(uint=>bytes32) public blockMroot;
@@ -50,8 +56,8 @@ contract Relay is HeaderParser {
         scheduleVersion = inputScheduleVersion;
         numProducers = numKeys;
         for( uint idx = 0; idx < numKeys; idx++) {
-            pubKeysFirstParts[idx] = inputPubKeysFirstParts[idx];
-            pubKeysSecondParts[idx] = inputPubKeysSecondParts[idx]; 
+            pubKeysFirstPartsPerSchedule[inputScheduleVersion][idx] = inputPubKeysFirstParts[idx];
+            pubKeysSecondPartsPerSchedule[inputScheduleVersion][idx] = inputPubKeysSecondParts[idx]; 
         }
     }
 
@@ -83,11 +89,11 @@ contract Relay is HeaderParser {
             claimedKeyIndices:claimedKeyIndices
         });
 
-        require(doVerifyBlockBasedOnSchedule(headersData));
+        require(verifyBlockIrreversible(headersData));
         require(storeNewSchedule(blockHeaders, completingKeyParts));
     }
 
-    function verifyBlockBasedOnSchedule(
+    function relayBlock(
         bytes memory blockHeaders,
         uint[] memory blockHeaderSizes,
         bytes32[] memory blockMerkleHashs,
@@ -115,36 +121,8 @@ contract Relay is HeaderParser {
             claimedKeyIndices:claimedKeyIndices
         });
 
-        require(doVerifyBlockBasedOnSchedule(headersData));
+        require(verifyBlockIrreversible(headersData));
         require(storeHeader(headersData));
-    }
-
-    function storeNewSchedule(
-        bytes memory blockHeaders,
-        bytes32[] memory completingKeyParts
-    )
-        internal
-        returns (bool)
-    {
-        uint32 version;
-        uint8 amount;
-        uint64[21] memory producerNames;
-        bytes32[21] memory producerCompressedKeys;
-
-        /* TODO: must get v part as well? */
-        /* assuming first block is the new producers block, so no need to separate it */
-        (version, amount, producerNames, producerCompressedKeys) = parseNonFixedFields(blockHeaders);
-
-        require(amount == producerCompressedKeys.length);
-
-        /* write new schedule to storage */ 
-        scheduleVersion = version;
-        for (uint idx = 0; idx < producerCompressedKeys.length; idx++) {
-            pubKeysFirstParts[idx] = producerCompressedKeys[idx];
-            pubKeysSecondParts[idx] = completingKeyParts[idx];
-        }
-
-        return true;
     }
 
     function verifyAction(
@@ -181,18 +159,47 @@ contract Relay is HeaderParser {
         return doVerifyAction(actionData);
     }
 
+    function storeNewSchedule(
+        bytes memory blockHeaders,
+        bytes32[] memory completingKeyParts
+    )
+        internal
+        returns (bool)
+    {
+        uint32 version;
+        uint8 amount;
+        uint64[21] memory producerNames;
+        bytes32[21] memory producerCompressedKeys;
+
+        /* TODO: must get v part as well? */
+        /* assuming first block is the new producers block, so no need to separate it */
+        (version, amount, producerNames, producerCompressedKeys) = parseNonFixedFields(blockHeaders);
+
+        require(amount == producerCompressedKeys.length);
+
+        /* write new schedule to storage */ 
+        scheduleVersion = version;
+        for (uint idx = 0; idx < producerCompressedKeys.length; idx++) {
+            pubKeysFirstPartsPerSchedule[version][idx] = producerCompressedKeys[idx];
+            pubKeysSecondPartsPerSchedule[version][idx] = completingKeyParts[idx];
+        }
+
+        return true;
+    }
+
     function doVerifyAction(verifyActionData memory actionData) internal view returns (bool) {
 
         /* verify block sig */
-        bool valid = doVerifyBlockSig(
+        uint blockScheduleVersion = getScheduleVersionFromHeader(actionData.blockHeader);
+        bool valid = doVerifyOneSig(
             actionData.blockHeader,
             actionData.blockMerkleHash,
             actionData.pendingScheduleHash,
             actionData.sigV,
             actionData.sigR,
             actionData.sigS,
-            pubKeysFirstParts[actionData.claimedKeyIndex],
-            pubKeysSecondParts[actionData.claimedKeyIndex]
+            pubKeysFirstPartsPerSchedule[blockScheduleVersion][actionData.claimedKeyIndex],
+            pubKeysSecondPartsPerSchedule[blockScheduleVersion][actionData.claimedKeyIndex]
         );
         if (!valid) return false;
 
@@ -216,7 +223,7 @@ contract Relay is HeaderParser {
         return true;
     }
 
-    function doVerifyBlockBasedOnSchedule(HeadersData memory headersData) internal view returns (bool) {
+    function verifyBlockIrreversible(HeadersData memory headersData) internal view returns (bool) {
         uint offset_in_headers = 0;
         uint pathOffset = 0;
         bytes32 currentId;
@@ -231,12 +238,16 @@ contract Relay is HeaderParser {
             );
             offset_in_headers = offset_in_headers + headersData.blockHeaderSizes[idx];
 
-            bool valid = verifyBlockSig(
+            /* current we only allow to relay blocks from latest schedule */
+            uint blockScheduleVersion = (uint)(getScheduleVersionFromHeader(header));
+            if (scheduleVersion != blockScheduleVersion) return false;
+
+            bool valid = verifyOneSig(
                 header,
                 headersData,
                 idx,
-                pubKeysFirstParts[headersData.claimedKeyIndices[idx]],
-                pubKeysSecondParts[headersData.claimedKeyIndices[idx]]
+                pubKeysFirstPartsPerSchedule[blockScheduleVersion][headersData.claimedKeyIndices[idx]],
+                pubKeysSecondPartsPerSchedule[blockScheduleVersion][headersData.claimedKeyIndices[idx]]
             );
             if (!valid) return false;
 
@@ -250,8 +261,6 @@ contract Relay is HeaderParser {
             }
             pathOffset = pathOffset + pathSize;
             previousId = currentId;
-
-            if (scheduleVersion != (uint)(getScheduleVersionFromHeader(header))) return false;
         }
 
         return true;
@@ -270,7 +279,7 @@ contract Relay is HeaderParser {
         return true;
     }
 
-    function verifyBlockSig(
+    function verifyOneSig(
         bytes memory blockHeader,
         HeadersData memory headersData,
         uint idx,
@@ -281,7 +290,7 @@ contract Relay is HeaderParser {
         pure
         returns (bool) 
     {
-        return doVerifyBlockSig(
+        return doVerifyOneSig(
             blockHeader,
             headersData.blockMerkleHashs[idx],
             headersData.pendingScheduleHashs[idx],
@@ -292,7 +301,7 @@ contract Relay is HeaderParser {
             claimedSignerPubKeySecond);
     }
 
-    function doVerifyBlockSig(
+    function doVerifyOneSig(
         bytes memory blockHeader,
         bytes32 blockMerkleHash,
         bytes32 pendingScheduleHash,
@@ -313,42 +322,7 @@ contract Relay is HeaderParser {
             (uint)(keccak256(abi.encodePacked(claimedSignerPubKeyFirst, claimedSignerPubKeySecond))) & (2**(8*21)-1)
         );
 
-        return ( calcAddress == claimedSignerAddress );
-    }
-
-    function getId(bytes memory header, uint blockNum) internal pure returns (bytes32) {
-        bytes32 headerHash = sha256(header);
-        uint blockNumShifted = blockNum << (256 - 32);
-        uint mask = ((2**(256 - 32))-1);
-        uint result = ((uint)(headerHash) & mask) | blockNumShifted;
-        return (bytes32)(result);
-    }
-
-    function getBlockNumFromId(bytes32 id) internal pure returns (uint) {
-        return ((uint)(id) >> (256 - 32));
-    }
-
-    function getBlockNumFromHeader(bytes memory header) internal pure returns (uint) {
-        uint offset = TIMESTAMP_BYTES + PRODUCER_BYTES + CONFIRMED_BYTES;
-        bytes32 previous = (bytes32)(sliceBytes(header, offset, PREVIOUS_BYTES));
-        return getBlockNumFromId((bytes32)(previous)) + 1;
-    }
-
-    function getIdFromHeader(bytes memory header) internal pure returns (bytes32) {
-        uint blockNum =getBlockNumFromHeader(header);
-        return getId(header, blockNum);
-    }
-
-    function getScheduleVersionFromHeader(bytes memory header) internal pure returns (uint32) {
-        uint offset = 78 + ACTION_MROOT_BYTES;
-        uint32 schedule = reverseBytes((uint32)(sliceBytes(header, offset, SCHEDULE_BYTES)));
-        return schedule;
-    }
-
-    function getActionMrootFromHeader(bytes memory header) internal pure returns (bytes32) {
-        uint offset = 78;
-        bytes32 actionMroot = (bytes32)(sliceBytes(header, offset, ACTION_MROOT_BYTES));
-        return actionMroot;
+        return (calcAddress == claimedSignerAddress);
     }
 
     function getOneHeader(
@@ -398,39 +372,5 @@ contract Relay is HeaderParser {
             path[i] = blockMerklePaths[pathOffset + i];
         }
         return path;
-    }
-
-    function makeCanonicalLeft(bytes32 self) internal pure returns (bytes32) {
-        return (bytes32)((uint)(self) & AND_MASK);
-    }
-
-    function makeCanonicalRight(bytes32 self) internal pure returns (bytes32) {
-        return (bytes32)((uint)(self) | OR_MASK);
-    }
-
-    function isCanonicalRight(bytes32 self) internal pure returns (bool) {
-        return (((uint)(self) >> 255) == 1);
-    }
-
-    function proofIsValid(bytes32 leaf, bytes32[] memory path, bytes32 expectedRoot) internal pure returns (bool) {
-        bytes32 current = leaf;
-        bytes32 left;
-        bytes32 right;
-        
-        for (uint i = 0; i < path.length; i++) {
-            if(isCanonicalRight(path[i])) {
-                left = current;
-                right = path[i];
-            } else {
-                left = path[i];
-                right = current;
-            }
-            left = makeCanonicalLeft(left);
-            right = makeCanonicalRight(right);
-
-            current = sha256(abi.encodePacked(left, right));
-        }
-
-        return (current == expectedRoot);
     }
 }

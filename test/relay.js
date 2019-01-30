@@ -174,7 +174,7 @@ contract("Relay", async accounts => {
         // get headers building on top of block 9626 (from c++) and use them to validate that block
         headersData = await getHeadersData("headers_9626.json", namesToIdxSchedule2)
 
-        await relay.verifyBlockBasedOnSchedule(
+        await relay.relayBlock(
             headersData.blockHeaders,
             headersData.blockHeaderSizes,
             headersData.blockMerkleHashs,
@@ -189,7 +189,7 @@ contract("Relay", async accounts => {
         // get headers building on top of block 10800 (from c++) and use them to validate that block
         headersData = await getHeadersData("headers_10800.json", namesToIdxSchedule2)
 
-        await relay.verifyBlockBasedOnSchedule(
+        await relay.relayBlock(
             headersData.blockHeaders,
             headersData.blockHeaderSizes,
             headersData.blockMerkleHashs,
@@ -201,7 +201,7 @@ contract("Relay", async accounts => {
             headersData.sigSs,
             headersData.claimedKeyIndices)
 
-        // get header with action
+        // get header with action in block 10776
         blockMerklePath = []
         producersData = JSON.parse(fs.readFileSync("header_10776.json", 'utf8'));
         thisData = producersData
@@ -216,7 +216,6 @@ contract("Relay", async accounts => {
         actionRecieptDigest = "0x" + thisData.action_receipt_digest;
         irreversibleBlockToReference = thisData.previous_block_num
 
-        lirb = await relay.lastIrreversibleBlock()
         const valid = await relay.verifyAction(
             irreversibleBlockToReference,
             blockHeader,

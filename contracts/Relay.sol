@@ -34,7 +34,7 @@ contract Relay is HeaderParser {
 
     bytes32[21] public pubKeysFirstParts;
     bytes32[21] public pubKeysSecondParts;
-    uint numProducers;
+    uint public numProducers;
     uint public scheduleVersion;
     uint public lastIrreversibleBlock;
     mapping(uint=>bool) public isBlockIrreversible;
@@ -330,7 +330,7 @@ contract Relay is HeaderParser {
 
     function getBlockNumFromHeader(bytes memory header) internal pure returns (uint) {
         uint offset = TIMESTAMP_BYTES + PRODUCER_BYTES + CONFIRMED_BYTES;
-        uint previous = (uint256)(sliceBytes(header, offset, PREVIOUS_BYTES));
+        bytes32 previous = (bytes32)(sliceBytes(header, offset, PREVIOUS_BYTES));
         return getBlockNumFromId((bytes32)(previous)) + 1;
     }
 

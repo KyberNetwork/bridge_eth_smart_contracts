@@ -70,7 +70,7 @@ async function readScheduleFromFile(fileName) {
     fs.writeFile('tmp_keys_for_python.json', publicKeysForPythonAsJson, 'utf8');
     
     await sleep(500)
-    require("child_process").execSync('python uncompress.py')
+    require("child_process").execSync('python scripts/uncompress.py')
     await sleep(500)
     fs.unlink("tmp_keys_for_python.json") // delete the tmp file we created earlier 
 
@@ -147,16 +147,16 @@ contract("Relay", async accounts => {
         const relay = await Relay.new()
 
         // store initial schedule, taken from new producers list in block 6713
-        let [version, namesToIdxSchedule1, fullKeys] = await readScheduleFromFile("producers_6713.json")
+        let [version, namesToIdxSchedule1, fullKeys] = await readScheduleFromFile("test/producers_6713.json")
         await relay.storeInitialSchedule(version, fullKeys["x"], fullKeys["y"], fullKeys["x"].length)
 
         // get new pending schedule from block 9313, which we want to change to
         let namesToIdxSchedule2
-        [version, namesToIdxSchedule2, fullKeys] = await readScheduleFromFile("producers_9313.json")
+        [version, namesToIdxSchedule2, fullKeys] = await readScheduleFromFile("test/producers_9313.json")
         completingKeyParts = fullKeys["y"]
 
         // get headers building on top of block 9313 (from c++) and use them to prove schedule change
-        headersData = await getHeadersData("headers_9313.json", namesToIdxSchedule1)
+        headersData = await getHeadersData("test/headers_9313.json", namesToIdxSchedule1)
 
         await relay.changeSchedule(
             headersData.blockHeaders,
@@ -172,7 +172,7 @@ contract("Relay", async accounts => {
             completingKeyParts)
 
         // get headers building on top of block 9626 (from c++) and use them to validate that block
-        headersData = await getHeadersData("headers_9626.json", namesToIdxSchedule2)
+        headersData = await getHeadersData("test/headers_9626.json", namesToIdxSchedule2)
 
         await relay.relayBlock(
             headersData.blockHeaders,
@@ -187,7 +187,7 @@ contract("Relay", async accounts => {
             headersData.claimedKeyIndices)
 
         // get headers building on top of block 10800 (from c++) and use them to validate that block
-        headersData = await getHeadersData("headers_10800.json", namesToIdxSchedule2)
+        headersData = await getHeadersData("test/headers_10800.json", namesToIdxSchedule2)
 
         await relay.relayBlock(
             headersData.blockHeaders,
@@ -203,7 +203,7 @@ contract("Relay", async accounts => {
 
         // get header with action in block 10776
         blockMerklePath = []
-        producersData = JSON.parse(fs.readFileSync("header_10776.json", 'utf8'));
+        producersData = JSON.parse(fs.readFileSync("test/header_10776.json", 'utf8'));
         thisData = producersData
         blockHeader = "0x" + thisData.raw_header
         blockMerkleHash = "0x" + thisData.block_mroot

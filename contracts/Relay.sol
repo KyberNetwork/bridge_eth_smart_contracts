@@ -18,6 +18,20 @@ contract Relay is HeaderParser {
         uint[] claimedKeyIndices;
     }
 
+    struct verifyActionData {
+        uint irreversibleBlockToReference;
+        bytes blockHeader;
+        bytes32 blockMerkleHash;
+        bytes32[] blockMerklePath;
+        bytes32 pendingScheduleHash;
+        uint8 sigV;
+        bytes32 sigR;
+        bytes32 sigS;
+        uint claimedKeyIndex;
+        bytes32[] actionPath;
+        bytes32 actionRecieptDigest;
+    }
+
     bytes32[21] public pubKeysFirstParts;
     bytes32[21] public pubKeysSecondParts;
     uint numProducers;
@@ -25,6 +39,7 @@ contract Relay is HeaderParser {
     uint public lastIrreversibleBlock;
     mapping(uint=>bool) public isBlockIrreversible;
     mapping(uint=>bytes) public irreversibleBlockHeaders;
+    mapping(uint=>bytes32) public blockMroot;
 
     function storeInitialSchedule(
         uint inputScheduleVersion,
@@ -137,7 +152,6 @@ contract Relay is HeaderParser {
         bytes memory blockHeader,
         bytes32 blockMerkleHash,
         bytes32[] memory blockMerklePath,
-        uint blockMerklePathSize,
         bytes32 pendingScheduleHash,
         uint8 sigV,
         bytes32 sigR,
@@ -150,21 +164,56 @@ contract Relay is HeaderParser {
         view
         returns (bool)
     {
-        /* verify block sig
-        bool valid = verifyBlockSig(
-            blockHeader,
-            headersData,
-            idx,
-            pubKeysFirstParts[headersData.claimedKeyIndices[idx]],
-            pubKeysSecondParts[headersData.claimedKeyIndices[idx]]
+        verifyActionData memory actionData = verifyActionData({
+            irreversibleBlockToReference:irreversibleBlockToReference,
+            blockHeader:blockHeader,
+            blockMerkleHash:blockMerkleHash,
+            blockMerklePath:blockMerklePath,
+            pendingScheduleHash:pendingScheduleHash,
+            sigV:sigV,
+            sigR:sigR,
+            sigS:sigS,
+            claimedKeyIndex:claimedKeyIndex,
+            actionPath:actionPath,
+            actionRecieptDigest:actionRecieptDigest
+        });
+
+        return doVerifyAction(actionData);
+    }
+
+    function doVerifyAction(verifyActionData memory actionData) internal view returns (bool) {
+
+        /* verify block sig */
+        bool valid = doVerifyBlockSig(
+            actionData.blockHeader,
+            actionData.blockMerkleHash,
+            actionData.pendingScheduleHash,
+            actionData.sigV,
+            actionData.sigR,
+            actionData.sigS,
+            pubKeysFirstParts[actionData.claimedKeyIndex],
+            pubKeysSecondParts[actionData.claimedKeyIndex]
         );
         if (!valid) return false;
-        */
 
-        /* make sure the blockis linked to an irreversible bloc */
-        /* .... */
+        /* make sure the block is linked to an irreversible block */
+        if (!isBlockIrreversible[actionData.irreversibleBlockToReference]) return false;
+        valid = proofIsValid(
+            getIdFromHeader(actionData.blockHeader),
+            actionData.blockMerklePath,
+            blockMroot[actionData.irreversibleBlockToReference]
+        );
+        if (!valid) return false;
 
         /* verify action path */
+        valid = proofIsValid(
+            actionData.actionRecieptDigest,
+            actionData.actionPath,
+            getActionMrootFromHeader(actionData.blockHeader)
+        );
+        if (!valid) return false;
+
+        return true;
     }
 
     function doVerifyBlockBasedOnSchedule(HeadersData memory headersData) internal view returns (bool) {
@@ -215,6 +264,7 @@ contract Relay is HeaderParser {
 
         isBlockIrreversible[blockNum] = true;
         irreversibleBlockHeaders[blockNum] = header;
+        blockMroot[blockNum] = headersData.blockMerkleHashs[0];
         if (blockNum > lastIrreversibleBlock) lastIrreversibleBlock = blockNum;
 
         return true;
@@ -231,9 +281,34 @@ contract Relay is HeaderParser {
         pure
         returns (bool) 
     {
-        bytes32 pairHash = sha256(abi.encodePacked(sha256(blockHeader), headersData.blockMerkleHashs[idx]));
-        bytes32 finalHash = sha256(abi.encodePacked(pairHash, headersData.pendingScheduleHashs[idx]));
-        address calcAddress = ecrecover(finalHash, headersData.sigVs[idx], headersData.sigRs[idx], headersData.sigSs[idx]);
+        return doVerifyBlockSig(
+            blockHeader,
+            headersData.blockMerkleHashs[idx],
+            headersData.pendingScheduleHashs[idx],
+            headersData.sigVs[idx],
+            headersData.sigRs[idx],
+            headersData.sigSs[idx],
+            claimedSignerPubKeyFirst,
+            claimedSignerPubKeySecond);
+    }
+
+    function doVerifyBlockSig(
+        bytes memory blockHeader,
+        bytes32 blockMerkleHash,
+        bytes32 pendingScheduleHash,
+        uint8 sigV,
+        bytes32 sigR,
+        bytes32 sigS,
+        bytes32 claimedSignerPubKeyFirst,
+        bytes32 claimedSignerPubKeySecond
+    )
+        internal
+        pure
+        returns (bool) 
+    {
+        bytes32 pairHash = sha256(abi.encodePacked(sha256(blockHeader), blockMerkleHash));
+        bytes32 finalHash = sha256(abi.encodePacked(pairHash, pendingScheduleHash));
+        address calcAddress = ecrecover(finalHash, sigV, sigR, sigS);
         address claimedSignerAddress = address(
             (uint)(keccak256(abi.encodePacked(claimedSignerPubKeyFirst, claimedSignerPubKeySecond))) & (2**(8*21)-1)
         );
@@ -268,6 +343,12 @@ contract Relay is HeaderParser {
         uint offset = 78 + ACTION_MROOT_BYTES;
         uint32 schedule = reverseBytes((uint32)(sliceBytes(header, offset, SCHEDULE_BYTES)));
         return schedule;
+    }
+
+    function getActionMrootFromHeader(bytes memory header) internal pure returns (bytes32) {
+        uint offset = 78;
+        bytes32 actionMroot = (bytes32)(sliceBytes(header, offset, ACTION_MROOT_BYTES));
+        return actionMroot;
     }
 
     function getOneHeader(

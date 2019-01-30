@@ -143,7 +143,7 @@ contract("Relay", async accounts => {
     });
 
 
-    it("store initial schedule, prove a schedule change (b9313) and relay a block (b9626)", async () => {
+    it("store initial schedule, prove a schedule (b9313), relay blocks (b9626, b10800), prove action(b10776)", async () => {
         const relay = await Relay.new()
 
         // store initial schedule, taken from new producers list in block 6713
@@ -201,20 +201,35 @@ contract("Relay", async accounts => {
             headersData.sigSs,
             headersData.claimedKeyIndices)
 
+        // get header with action
+        blockMerklePath = []
+        producersData = JSON.parse(fs.readFileSync("header_10776.json", 'utf8'));
+        thisData = producersData
+        blockHeader = "0x" + thisData.raw_header
+        blockMerkleHash = "0x" + thisData.block_mroot
+        blockMerklePath = add0xToAllItems(thisData.proof_path)
+        pendingScheduleHash = "0x" + thisData.pending_schedule_hash
+        let arr = getSigParts(bs58SigToHex(thisData.producer_signature))
+        sigV = arr[0], sigR = arr[1], sigS = arr[2];
+        claimedKeyIndex = namesToIdxSchedule2[thisData.producer]
+        actionPath = add0xToAllItems(thisData.action_proof_path)
+        actionRecieptDigest = "0x" + thisData.action_receipt_digest;
+        irreversibleBlockToReference = thisData.previous_block_num
+
         lirb = await relay.lastIrreversibleBlock()
-        await relay.verifyAction(
-            lirb,
-        bytes memory blockHeader,
-        bytes32 blockMerkleHash,
-        bytes32[] memory blockMerklePath,
-        uint blockMerklePathSize,
-        bytes32 pendingScheduleHash,
-        uint8 sigV,
-        bytes32 sigR,
-        bytes32 sigS,
-        uint claimedKeyIndex,
-        bytes32[] memory actionPath,
-        bytes32 actionRecieptDigest
+        const valid = await relay.verifyAction(
+            irreversibleBlockToReference,
+            blockHeader,
+            blockMerkleHash,
+            blockMerklePath,
+            pendingScheduleHash,
+            sigV,
+            sigR,
+            sigS,
+            claimedKeyIndex,
+            actionPath,
+            actionRecieptDigest)
+        assert(valid)
 
     });
 })

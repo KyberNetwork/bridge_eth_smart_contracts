@@ -177,9 +177,10 @@ contract Relay is HeaderParser, MerkleProof {
 
         require(amount == producerCompressedKeys.length);
 
-        /* write new schedule to storage */ 
+        /* write new schedule to storage */
+        numProducers = amount;
         scheduleVersion = version;
-        for (uint idx = 0; idx < producerCompressedKeys.length; idx++) {
+        for (uint idx = 0; idx < amount; idx++) {
             pubKeysFirstPartsPerSchedule[version][idx] = producerCompressedKeys[idx];
             pubKeysSecondPartsPerSchedule[version][idx] = completingKeyParts[idx];
         }

@@ -21,7 +21,8 @@ const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
 const solc = require('solc')
 
 const rand = web3.utils.randomHex(7)
-const privateKey = web3.utils.sha3('in love we trust' + rand)
+//const privateKey = web3.utils.sha3('in love we trust' + rand)
+const privateKey = "6C6C6EE849E458867EDC156F9831AED77F622CCEEDD876DBED0DEBEDFF5B23A7"
 console.log('privateKey', privateKey)
 
 if (printPrivateKey) {
@@ -205,7 +206,8 @@ async function proveAction(myContract) {
 
     // get header with action in block 10776
     actionData = await relayHelper.getActionData("test/header_10776.json", namesToIdxSchedule2)
-    const valid = await myContract.methods.verifyAction(
+
+    await sendTx(myContract.methods.verifyAction(
         actionData.irreversibleBlockToReference,
         actionData.blockHeader,
         actionData.blockMerkleHash,
@@ -216,9 +218,7 @@ async function proveAction(myContract) {
         actionData.sigS,
         actionData.claimedKeyIndex,
         actionData.actionPath,
-        actionData.actionRecieptDigest).call()
-    assert(valid)
-    console.log("action from block 10776 validity is:", valid)
+        actionData.actionRecieptDigest))
 }
 
 async function main() {

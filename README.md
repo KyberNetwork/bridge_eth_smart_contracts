@@ -11,7 +11,7 @@ https://kovan.etherscan.io/address/0x2b08EBa5972e21C5551f3723BA46Ee9514d18485
 https://github.com/talbaneth/bridge_eth_smart_contracts/blob/master/scripts/relayDeployer.js#L202
 
 ### Smart contract test data:
-manufactued using https://github.com/talbaneth/eos/blob/relay_data/programs/relay-data/main.cpp
+manufactued using https://github.com/talbaneth/eos/blob/relay_data/programs/relay-data/main.cpp. 
 inputs for this c++ program:
 * jungle_first_11k.json (manufactured from scripts/get_headers_from_blockchain.sh)
 * action_receipts_digests_10776.json (manufactured by replaying altered node)
